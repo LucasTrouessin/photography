@@ -89,3 +89,16 @@ img{-webkit-user-drag:none;user-select:none;-webkit-user-select:none;-webkit-tou
 .wm.light svg{filter:drop-shadow(0 0 1.5px rgba(0,0,0,.45))}
 .wm.dark svg{filter:drop-shadow(0 0 1.5px rgba(255,255,255,.4))}
 @media(max-width:700px){.project-image .wm-wrap{display:block}}
+
+/* ---- Galerie : colonnes remplies dans l'ordre par site.js ---- */
+.gallery{columns:auto;display:flex;gap:32px;align-items:flex-start}
+.gallery .gcol{flex:1;min-width:0}
+.gallery .empty{flex:1}
+@media(max-width:700px){.gallery{columns:auto}}
+
+/* ---- Barre du haut : nom du projet en cours ---- */
+.nav .brand,.nav nav{flex:none}
+.nav .where{flex:1;min-width:0;padding:0 20px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:11px "DM Mono",monospace;text-transform:uppercase}
+.nav .where .cat{color:var(--muted)}
+.nav .where .cat::after{content:" / "}
+@media(max-width:700px){.nav .where{padding:0 12px}.nav .where .cat{display:none}}

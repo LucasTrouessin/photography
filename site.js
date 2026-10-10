@@ -34,6 +34,40 @@
     return wrap;
   }
 
+  /* ---------- RÉPARTITION EN COLONNES (même calcul que l'aperçu de l'admin) ----------
+     ratios : largeur/hauteur de chaque photo, dans l'ordre. Renvoie les index par colonne.
+     Chaque photo va dans la colonne la moins haute (à égalité : la gauche). À la fin, si la
+     colonne de droite dépasse, sa dernière photo passe à gauche : c'est la gauche qui dépasse. */
+  const GAP = 0.05;              // espace entre photos, en proportion de la largeur d'une colonne
+  function splitColumns(ratios, n, final) {
+    const cols = Array.from({ length: n }, () => []), hts = new Array(n).fill(0);
+    ratios.forEach((r, i) => {
+      let c = 0;
+      for (let k = 1; k < n; k++) if (hts[k] < hts[c] - 1e-6) c = k;
+      cols[c].push(i); hts[c] += 1 / r + GAP;
+    });
+    if (final && n === 2 && hts[1] > hts[0] + 1e-6 && cols[1].length > 1) cols[0].push(cols[1].pop());
+    return cols;
+  }
+
+  /* ---------- ACCUEIL : texte et grande photo ---------- */
+  function renderHeroText(data) {
+    const t = data.hero && data.hero.title;
+    const h1 = document.querySelector(".hero-caption h1");
+    if (!h1 || typeof t !== "string") return;
+    h1.replaceChildren();
+    t.split("\n").forEach((line, i) => {
+      if (i) h1.appendChild(document.createElement("br"));
+      h1.appendChild(document.createTextNode(line));
+    });
+    h1.hidden = !t.trim();
+  }
+  function setHeroImage(src) {   // l'image n'a pas de src dans index.html : on la choisit ici
+    const img = document.querySelector(".hero-image img");
+    if (img && !img.getAttribute("src")) img.src = src || img.dataset.default || "fondo.jpeg";
+    return img;
+  }
+
   const path = (p, file) => `${p.folder}/${file}`;
   const cover = p => p.cover || p.photos[0];
 
@@ -80,29 +114,53 @@
     head.appendChild(el("h1", { text: p.title }));
     if (p.description) head.appendChild(el("p", { text: p.description }));
 
+    // nom du projet dans la barre du haut (reste visible au défilement)
+    const brand = document.querySelector(".nav .brand");
+    if (brand) brand.insertAdjacentElement("afterend", el("span", { class: "where" }, [
+      el("span", { class: "cat", text: cat.label }), el("span", { text: p.title })
+    ]));
+
+    // Galerie en 2 colonnes, remplies dans l'ordre (1 à gauche, 2 à droite…) en équilibrant
+    // les hauteurs. Une fois tout chargé, s'il reste un décalage, c'est la colonne de gauche qui dépasse.
     const list = p.photos;
     if (!list.length) gal.appendChild(el("p", { class: "empty", text: "No photos yet." }));
-    const loaded = [];           // urls réellement chargées
-    let failed = 0;
+    const items = [];            // dans l'ordre des photos : { fig, img, ratio, state }
+    const ordered = () => items.filter(it => it.state === "ok").map(it => it.img);
+    const narrow = window.matchMedia("(max-width: 700px)");
+    let lastKey = "";
+    function layout() {
+      let k = 0;
+      while (k < items.length && items[k].state !== "wait") k++;        // photos prêtes, sans trou
+      const done = k === items.length, n = narrow.matches ? 1 : 2;
+      const key = `${k}|${n}`;
+      if (key === lastKey) return;
+      lastKey = key;
+      const ok = items.slice(0, k).filter(it => it.state === "ok");
+      if (done && !ok.length) {
+        gal.replaceChildren(el("p", { class: "empty", text: `No photos yet — add them to ${p.folder}/` }));
+        return;
+      }
+      const cols = splitColumns(ok.map(it => it.ratio), n, done);
+      gal.replaceChildren(...cols.map(c => el("div", { class: "gcol" }, c.map(i => ok[i].fig))));
+    }
+    const onBreakpoint = () => { lastKey = ""; layout(); };
+    if (narrow.addEventListener) narrow.addEventListener("change", onBreakpoint); else narrow.addListener(onBreakpoint);
+
     list.forEach((f, i) => {
-      const fig = el("figure");
       const img = new Image();
+      const it = { fig: el("figure"), img, ratio: 1, state: "wait" };
       img.alt = `${p.title} — photo ${i + 1}`;
-      img.loading = "lazy";
       img.tabIndex = 0;
-      img.onload = () => { loaded.push(img); };
-      img.onerror = () => {
-        fig.remove();
-        if (++failed === list.length) {
-          gal.appendChild(el("p", { class: "empty", text: `No photos yet — add them to ${p.folder}/` }));
-        }
-      };
-      img.src = path(p, f);
-      const open = () => openLightbox(gal.querySelectorAll("img"), img);
+      img.decoding = "async";
+      if (i > 5) img.fetchPriority = "low";
+      img.onload = () => { it.ratio = (img.naturalWidth / img.naturalHeight) || 1; it.state = "ok"; layout(); };
+      img.onerror = () => { it.state = "bad"; layout(); };
+      const open = () => openLightbox(ordered(), img);
       img.addEventListener("click", open);
       img.addEventListener("keydown", e => { if (e.key === "Enter") open(); });
-      fig.appendChild(withMark(img));
-      gal.appendChild(fig);
+      it.fig.appendChild(withMark(img));
+      items.push(it);
+      img.src = path(p, f);
     });
 
     // projet précédent / suivant dans la même catégorie
@@ -180,7 +238,8 @@
     .then(data => {
       setWatermark(data);
       if (page === "home") {
-        const hero = document.querySelector(".hero-image img");
+        const hero = setHeroImage(data.hero && data.hero.image);
+        renderHeroText(data);
         if (hero && WM) {
           if (hero.complete && hero.naturalWidth) withMark(hero);
           else hero.addEventListener("load", () => withMark(hero), { once: true });
@@ -191,6 +250,7 @@
     })
     .catch(err => {
       console.error("Impossible de charger site.json", err);
+      if (page === "home") setHeroImage();
       const m = document.querySelector("main");
       if (m) m.appendChild(el("p", { class: "empty", text: "Unable to load the content." }));
     });

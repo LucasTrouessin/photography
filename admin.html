@@ -96,6 +96,24 @@
   .wm-off .wm{display:none}
   .wm-off .wm-prev{opacity:.5}
 
+  /* accueil */
+  .hero-pv{display:block;max-width:100%;max-height:220px;background:#e4e1da;margin-top:4px}
+  .hero-pv.none{width:100%;height:120px}
+  .grid.hero-hist{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+  .hero-hist .im{aspect-ratio:16/9}
+  .adm .hero-hist .tile .tb{grid-template-columns:1fr auto}
+  .adm .hero-hist .tile .tb button{padding:7px 10px;font-size:11px}
+
+  /* aperçu de la page d'un projet */
+  .adm button.pv-tgl{margin-top:18px;background:none;color:var(--fg);border-color:var(--line)}
+  .pv{margin-top:12px;padding:14px;border:1px solid var(--line);background:var(--bg)}
+  .pv-cols{display:flex;gap:6px;align-items:flex-start;max-width:420px;margin:0 auto}
+  .pv-col{flex:1;min-width:0}
+  .pv-it{position:relative;margin:0 0 6px;background:#e4e1da}
+  .pv-it img{display:block;width:100%;height:auto}
+  .pv-it span{position:absolute;left:4px;top:4px;background:rgba(21,21,21,.85);color:#fff;font:9px "DM Mono",monospace;padding:2px 5px}
+  .pv-it.bad{aspect-ratio:3/2}
+
   .savebar{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:6px 20px 14px;margin:24px -20px 0;z-index:3}
   .savebar .msg{margin-top:10px}
 </style>
@@ -140,6 +158,13 @@
       <button id="addCat" class="sm" type="button">Ajouter</button>
     </div>
 
+    <h2 style="margin-top:44px">Page d'accueil</h2>
+    <label class="f">Texte sous la grande photo</label>
+    <p class="ph-note" style="margin:0">Entrée = retour à la ligne · Ctrl+Entrée ou cliquer ailleurs pour valider.</p>
+    <div id="heroTitle"></div>
+    <label class="f">Grande photo</label>
+    <div id="heroImg"></div>
+
     <h2 style="margin-top:44px">À propos et contact</h2>
     <label class="f">Texte « About »</label>
     <div id="aboutText"></div>
@@ -176,7 +201,7 @@
   let repoFiles = new Set();               // fichiers déjà présents dans le dépôt
   let treeKnown = false;                   // true si la liste des fichiers du dépôt a pu être lue
   let renderGen = 0;                       // sert à abandonner les chargements d'une ancienne vue
-  const ui = { cats: new Set(), projs: new Set() };   // éléments dépliés
+  const ui = { cats: new Set(), projs: new Set(), pv: new Set() };   // éléments dépliés / aperçus ouverts
   let resizeImpl = resize;
   let busy = false;
 
@@ -228,7 +253,20 @@
   }
   const allProjects = d => d.categories.flatMap(c => c.projects);
   const folders = d => new Set(allProjects(d).map(p => p.folder));
-  const photoPaths = d => new Set(allProjects(d).flatMap(p => p.photos.map(n => `${p.folder}/${n}`)));
+  const photoPaths = d => {                // toutes les photos du site, grande photo d'accueil comprise
+    const s = new Set(allProjects(d).flatMap(p => p.photos.map(n => `${p.folder}/${n}`)));
+    heroAll(d).forEach(x => s.add(x));
+    return s;
+  };
+  function heroAll(d) {                    // grande photo actuelle + anciennes gardées
+    const hh = d.hero || {};
+    return (hh.image ? [hh.image] : []).concat(Array.isArray(hh.history) ? hh.history : []);
+  }
+  const stamp = () => {                    // 20261010-131500 : sert à nommer les nouveaux fichiers
+    const d = new Date(), z = n => pad(n);
+    return `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}`;
+  };
+  const HERO_SIDE = 2560;                  // la grande photo s'affiche sur toute la largeur de l'écran
   const isDirty = () => !!(saved && work) && (serialize(work) !== serialize(saved.data) || pendingThumbs.size > 0);
   const thumbOfPath = path => {            // dossier/NOM.jpg -> dossier/thumbs/NOM.jpg
     const i = path.lastIndexOf("/");
@@ -699,6 +737,12 @@
             pb.appendChild(editable({ label: "description du projet", multiline: true, get: () => p.description || "", set: v => { p.description = v; }, onChange: updateSave, placeholder: "Ajouter une description…" }));
             pb.appendChild(h("div", { class: "meta", text: `Dossier : ${p.folder}` }));
             pb.appendChild(photoSection(p));
+            if (p.photos.length) {
+              const pvOpen = ui.pv.has(p.slug);
+              pb.appendChild(btn(pvOpen ? "Masquer l'aperçu de la page" : "Voir l'aperçu de la page", "Aperçu de la mise en page du projet",
+                () => { toggle(ui.pv, p.slug); render(); }, false, "pv-tgl"));
+              if (pvOpen) pb.appendChild(pagePreview(p));
+            }
             const row = h("div", { class: "btns" });
             const others = cats.map((c, i) => ({ c, i })).filter(x => x.i !== ci);
             if (others.length) {
@@ -723,6 +767,113 @@
     $("aboutText").replaceChildren(editable({ label: "texte About", multiline: true, get: () => work.about.text || "", set: v => { work.about.text = v; }, onChange: updateSave, placeholder: "Ajouter un texte…" }));
     $("aboutEmail").replaceChildren(editable({ label: "email de contact", type: "email", get: () => work.about.email || "", set: v => { work.about.email = v; }, onChange: updateSave, placeholder: "Ajouter un email…" }));
     $("wmBox").replaceChildren(watermarkSection());
+    $("heroTitle").replaceChildren(editable({ label: "texte de la page d'accueil", multiline: true, cls: "big",
+      get: () => (work.hero && typeof work.hero.title === "string") ? work.hero.title : "",
+      set: v => { work.hero = Object.assign({}, work.hero, { title: v }); },
+      onChange: updateSave, placeholder: "Aucun texte (cliquer pour en ajouter)" }));
+    $("heroImg").replaceChildren(heroSection());
+  }
+
+  /* ---------- page d'accueil : grande photo ---------- */
+  const heroSrc = path => previews.get(path) || encodeURI(path);
+  const heroHistory = () => (work.hero && Array.isArray(work.hero.history)) ? work.hero.history : [];
+  function setHeroState(image, history) {
+    work.hero = Object.assign({}, work.hero, { image: image || "", history });
+    if (!history.length) delete work.hero.history;
+  }
+  function forgetLocal(path) {             // photo choisie puis abandonnée avant tout enregistrement
+    pending.delete(path);
+    if (previews.has(path)) { URL.revokeObjectURL(previews.get(path)); previews.delete(path); }
+  }
+  function heroSection() {
+    const cur = work.hero && work.hero.image, hist = heroHistory();
+    const input = h("input", { type: "file", accept: "image/*", class: "hidden", "aria-label": "Choisir la grande photo" });
+    input.addEventListener("change", () => { replaceHero(input.files[0]); input.value = ""; });
+    const pic = cur ? h("img", { class: "hero-pv", alt: "Grande photo actuelle", src: heroSrc(cur) })
+                    : h("div", { class: "hero-pv none" });
+    const box = h("div", {}, [pic, input,
+      h("div", { class: "meta", text: cur ? `Fichier : ${cur}${pending.has(cur) ? " (nouvelle, pas encore enregistrée)" : ""}` : "Aucune photo" }),
+      h("div", { class: "btns", style: "margin-top:12px" }, [btn("Changer la photo", "Changer la grande photo de l'accueil", () => input.click())])
+    ]);
+    if (hist.length) {
+      box.appendChild(h("label", { class: "f", style: "margin-top:26px", text: `Anciennes photos · ${hist.length}` }));
+      box.appendChild(h("p", { class: "ph-note", style: "margin-top:0", text: "Elles restent dans le dépôt mais ne s'affichent pas sur le site. « Utiliser » remet une photo à l'accueil (la photo actuelle rejoint alors cette liste)." }));
+      box.appendChild(h("div", { class: "grid hero-hist" }, hist.map(path => h("div", { class: "tile" }, [
+        h("div", { class: "im" }, [h("img", { alt: path, src: heroSrc(path), decoding: "async" })]),
+        h("div", { class: "tb" }, [
+          btn("Utiliser", "Remettre cette photo à l'accueil", () => useHero(path)),
+          btn("✕", "Supprimer définitivement cette ancienne photo", () => dropHero(path), false, "danger")
+        ])
+      ]))));
+    }
+    return box;
+  }
+  function useHero(path) {
+    const cur = work.hero && work.hero.image;
+    const hist = heroHistory().filter(x => x !== path);
+    if (cur) hist.unshift(cur);
+    setHeroState(path, hist); changed();
+  }
+  function dropHero(path) {
+    if (!confirm(`Supprimer définitivement cette ancienne photo (${path}) ?\nElle sera effacée du dépôt à l'enregistrement.`)) return;
+    setHeroState(work.hero.image, heroHistory().filter(x => x !== path));
+    forgetLocal(path); changed();
+  }
+  async function replaceHero(file) {
+    if (!file || busy) return;
+    busy = true; updateSave(); say($("saveMsg"), "Préparation de la photo…");
+    try {
+      const blob = await resizeImpl(file, HERO_SIDE, QUALITY);
+      const old = work.hero && work.hero.image;
+      const hist = heroHistory().slice();
+      if (old && pending.has(old)) forgetLocal(old);    // jamais publiée : inutile de la garder
+      else if (old) hist.unshift(old);                  // déjà en ligne : on la garde dans les anciennes
+      const path = `hero/${stamp()}-${Math.random().toString(36).slice(2, 5).padEnd(3, "0")}.jpg`;
+      pending.set(path, { blob });
+      previews.set(path, URL.createObjectURL(blob));
+      setHeroState(path, hist);
+      busy = false; changed();
+      say($("saveMsg"), "Nouvelle photo prête. Clique sur « Enregistrer » pour la publier.", "ok");
+    } catch (e) {
+      busy = false; updateSave(); say($("saveMsg"), "Ce format d'image n'est pas pris en charge.", "err");
+    }
+  }
+
+  /* ---------- aperçu de la page d'un projet (même calcul que site.js) ---------- */
+  const GAP = 0.05;
+  function splitColumns(ratios, n, final) {
+    const cols = Array.from({ length: n }, () => []), hts = new Array(n).fill(0);
+    ratios.forEach((r, i) => {
+      let c = 0;
+      for (let k = 1; k < n; k++) if (hts[k] < hts[c] - 1e-6) c = k;
+      cols[c].push(i); hts[c] += 1 / r + GAP;
+    });
+    if (final && n === 2 && hts[1] > hts[0] + 1e-6 && cols[1].length > 1) cols[0].push(cols[1].pop());
+    return cols;
+  }
+  function pagePreview(p) {
+    const note = h("p", { class: "ph-note", style: "margin-top:0", text: "Chargement de l'aperçu…" });
+    const area = h("div", { class: "pv-cols" });
+    const items = p.photos.map((name, i) => {
+      const path = `${p.folder}/${name}`, tp = thumbOfPath(path);
+      const img = h("img", { alt: name, decoding: "async" });
+      const it = { i, img, ratio: 1.5, state: "wait" };
+      img.onload = () => { it.ratio = (img.naturalWidth / img.naturalHeight) || 1.5; it.state = "ok"; draw(); };
+      img.onerror = () => { it.state = "bad"; draw(); };
+      img.src = previews.get(path) || encodeURI(repoFiles.has(tp) ? tp : path);
+      return it;
+    });
+    function draw() {
+      const left = items.filter(it => it.state === "wait").length;
+      if (left) { note.textContent = `Chargement de l'aperçu… ${items.length - left}/${items.length}`; return; }
+      note.textContent = "Sur ordinateur, comme sur le site. Sur téléphone, les photos s'affichent l'une sous l'autre, dans l'ordre.";
+      const cols = splitColumns(items.map(it => it.ratio), 2, true);
+      area.replaceChildren(...cols.map(c => h("div", { class: "pv-col" }, c.map(k => {
+        const it = items[k];
+        return h("div", { class: "pv-it" + (it.state === "bad" ? " bad" : "") }, [it.img, h("span", { text: pad(it.i + 1) })]);
+      }))));
+    }
+    return h("div", { class: "pv" }, [note, area]);
   }
 
   /* ---------- filigrane ---------- */
@@ -779,14 +930,18 @@
     const keptFolders = folders(work), keptPaths = photoPaths(work);
     const delFolders = [...folders(saved.data)].filter(f => !keptFolders.has(f));
     const removedPhotos = [...photoPaths(saved.data)].filter(p => !keptPaths.has(p) && !delFolders.some(f => p.startsWith(f + "/")));
-    const delPaths = removedPhotos.concat(removedPhotos.map(thumbOfPath));
+    const delPaths = removedPhotos.concat(removedPhotos.filter(x => x.includes("/")).map(thumbOfPath));
+    const oldHeroes = new Set(heroAll(saved.data));
+    const heroGone = removedPhotos.filter(x => oldHeroes.has(x));
+    const removedCount = removedPhotos.length - heroGone.length;
     const keptThumbs = new Set([...keptPaths].map(thumbOfPath));
     const photoUploads = [...pending.entries()].filter(([path]) => keptPaths.has(path)).map(([path, v]) => ({ path, blob: v.blob }));
     const uploads = photoUploads.concat([...pendingThumbs.entries()].filter(([path]) => keptThumbs.has(path)).map(([path, v]) => ({ path, blob: v.blob })));
 
     if (delFolders.length || removedPhotos.length) {
       const names = saved.data.categories.flatMap(c => c.projects).filter(p => delFolders.includes(p.folder)).map(p => `• projet « ${p.title} » et toutes ses photos`);
-      if (removedPhotos.length) names.push(`• ${plural(removedPhotos.length, "photo")} retirée${removedPhotos.length > 1 ? "s" : ""} de projets conservés`);
+      if (removedCount) names.push(`• ${plural(removedCount, "photo")} retirée${removedCount > 1 ? "s" : ""} de projets conservés`);
+      heroGone.forEach(x => names.push(`• une ancienne photo d'accueil (${x})`));
       if (!confirm(`Ces éléments vont être supprimés définitivement :\n\n${names.join("\n")}\n\nContinuer ?`)) return;
     }
 
