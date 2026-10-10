@@ -80,6 +80,11 @@
   .adm .tile .tb button{padding:7px 0;font-size:12px;letter-spacing:0;text-transform:none;border-color:var(--line);background:none;color:var(--fg)}
   .adm .tile .tb button.on{background:var(--fg);color:var(--bg)}
   .adm .tile .tb button:disabled{opacity:.25}
+  .tile .im.bad{cursor:pointer}
+  .tile .im.bad::after{content:"↻ Réessayer";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:10px "DM Mono",monospace;color:var(--muted);text-transform:uppercase;text-align:center}
+  .tile .im.bad img{visibility:hidden}
+  .gen{margin:0 0 18px;padding:12px 14px;border:1px dashed var(--line);font-size:13px;color:var(--muted);line-height:1.5}
+  .gen button{margin-top:10px}
   .empty-ph{color:var(--muted);font-size:13px;padding:14px 0}
 
   .savebar{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:6px 20px 14px;margin:24px -20px 0;z-index:3}
@@ -118,19 +123,19 @@
 
   <!-- ÉDITION -->
   <section id="editor" class="hidden">
-    <h2>À propos et contact</h2>
-    <label class="f">Texte « About »</label>
-    <div id="aboutText"></div>
-    <label class="f">Email de contact</label>
-    <div id="aboutEmail"></div>
-
-    <h3>Catégories et projets</h3>
+    <h2>Catégories et projets</h2>
     <p class="lead" style="margin-bottom:18px">Clique sur une catégorie puis sur un projet pour le modifier. Les textes se modifient en cliquant dessus. Rien n'est appliqué avant « Enregistrer ».</p>
     <div id="catList"></div>
     <div class="add-row">
       <input id="newCat" type="text" placeholder="Nouvelle catégorie" autocomplete="off" aria-label="Nom de la nouvelle catégorie">
       <button id="addCat" class="sm" type="button">Ajouter</button>
     </div>
+
+    <h2 style="margin-top:44px">À propos et contact</h2>
+    <label class="f">Texte « About »</label>
+    <div id="aboutText"></div>
+    <label class="f">Email de contact</label>
+    <div id="aboutEmail"></div>
 
     <div class="savebar">
       <button id="save" disabled style="margin-top:12px">Enregistrer</button><button id="logout" class="ghost" style="margin-top:12px">Se déconnecter</button>
@@ -146,15 +151,20 @@
   const TOKEN_KEY = "admin-token";         // seulement si « se souvenir » est coché
   const CONFLICT = "Le site a été modifié ailleurs entre-temps. Recharge la page puis refais ta modification.";
   const MAX_SIDE = 2000, QUALITY = 0.82;   // même réglage que le script de compression
+  const THUMB_SIDE = 400, THUMB_Q = 0.7;   // miniatures utilisées seulement dans l'admin
   const FINE = !!(window.matchMedia && window.matchMedia("(pointer: fine)").matches);
 
   let conn = null;                         // { owner, repo, branch, token }
   let saved = null;                        // { data, sha } : site.json tel qu'il est sur GitHub
   let work = null;                         // copie en cours d'édition
   const pending = new Map();               // chemin -> { blob } : photos à envoyer au prochain enregistrement
-  const previews = new Map();              // chemin -> url locale (aperçu immédiat, même avant la mise en ligne)
+  const pendingThumbs = new Map();         // chemin miniature -> { blob } : miniatures à envoyer
+  const previews = new Map();              // chemin photo -> url locale de la miniature (aperçu immédiat)
+  let repoFiles = new Set();               // fichiers déjà présents dans le dépôt
+  let treeKnown = false;                   // true si la liste des fichiers du dépôt a pu être lue
+  let renderGen = 0;                       // sert à abandonner les chargements d'une ancienne vue
   const ui = { cats: new Set(), projs: new Set() };   // éléments dépliés
-  let compressImpl = compress;
+  let resizeImpl = resize;
   let busy = false;
 
   /* ---------- utilitaires ---------- */
@@ -206,7 +216,11 @@
   const allProjects = d => d.categories.flatMap(c => c.projects);
   const folders = d => new Set(allProjects(d).map(p => p.folder));
   const photoPaths = d => new Set(allProjects(d).flatMap(p => p.photos.map(n => `${p.folder}/${n}`)));
-  const isDirty = () => !!(saved && work) && serialize(work) !== serialize(saved.data);
+  const isDirty = () => !!(saved && work) && (serialize(work) !== serialize(saved.data) || pendingThumbs.size > 0);
+  const thumbOfPath = path => {            // dossier/NOM.jpg -> dossier/thumbs/NOM.jpg
+    const i = path.lastIndexOf("/");
+    return path.slice(0, i) + "/thumbs/" + path.slice(i + 1).replace(/\.[^.]+$/, "") + ".jpg";
+  };
   const toggle = (set, k) => set.has(k) ? set.delete(k) : set.add(k);
   const plural = (n, w) => `${n} ${w}${n > 1 ? "s" : ""}`;
 
@@ -279,6 +293,15 @@
     return removed;
   }
 
+  async function refreshTree() {           // liste des fichiers du dépôt (pour savoir quelles miniatures existent)
+    try {
+      const t = await gh("GET", `git/trees/${encodeURIComponent(conn.branch)}?recursive=1`);
+      if (t.truncated) throw new Error("trop gros");
+      repoFiles = new Set(t.tree.filter(x => x.type === "blob").map(x => x.path));
+      treeKnown = true;
+    } catch (e) { repoFiles = new Set(); treeKnown = false; }
+  }
+
   async function fetchSite() {
     const f = await gh("GET", `contents/site.json?ref=${encodeURIComponent(conn.branch)}`);
     if (!f.content) throw new Error("site.json est trop volumineux pour cette interface.");
@@ -297,6 +320,7 @@
     $("connect").disabled = true; say($("loginMsg"), "Connexion…");
     try {
       saved = await fetchSite();
+      await refreshTree();
       localStorage.setItem(CONN_KEY, JSON.stringify({ owner: conn.owner, repo: conn.repo, branch: conn.branch }));
       if ($("remember").checked) localStorage.setItem(TOKEN_KEY, conn.token);
       else localStorage.removeItem(TOKEN_KEY);
@@ -318,7 +342,7 @@
   function logout() {
     localStorage.removeItem(TOKEN_KEY);
     conn = null; saved = null; work = null;
-    pending.clear();
+    pending.clear(); pendingThumbs.clear();
     $("token").value = "";
     $("editor").classList.add("hidden");
     $("login").classList.remove("hidden");
@@ -410,7 +434,7 @@
     ui.cats.add(cat.id); ui.projs.add(slug); changed(); return true;
   }
   function dropLocalFiles(prefix) {        // oublie les photos locales d'un projet retiré
-    [pending, previews].forEach(m => [...m.keys()].forEach(k => {
+    [pending, pendingThumbs, previews].forEach(m => [...m.keys()].forEach(k => {
       if (k.startsWith(prefix)) { if (m === previews) URL.revokeObjectURL(m.get(k)); m.delete(k); }
     }));
   }
@@ -426,6 +450,36 @@
     work.categories[ti].projects.push(p); changed();
   }
 
+  /* ---------- chargement des miniatures : 3 à la fois, avec nouvelles tentatives ---------- */
+  const loadQ = []; let loading = 0;
+  function pump() {
+    while (loading < 3 && loadQ.length) {
+      const job = loadQ.shift();
+      if (job.gen !== renderGen) continue;               // la vue a changé : on abandonne
+      loading++; attempt(job);
+    }
+  }
+  function attempt(job) {
+    const done = () => { loading--; pump(); };
+    job.img.onload = () => { job.box.classList.remove("bad"); done(); };
+    job.img.onerror = () => {
+      done();
+      job.tries++;
+      if (job.tries < 3) { setTimeout(() => { loadQ.push(job); pump(); }, 700 * job.tries); }
+      else if (job.k < job.urls.length - 1) { job.k++; job.tries = 0; loadQ.push(job); pump(); }
+      else job.box.classList.add("bad");                 // abandon : clic = réessayer
+    };
+    job.img.src = job.urls[job.k];
+  }
+  function loadImage(img, box, urls) {
+    const job = { img, box, urls, k: 0, tries: 0, gen: renderGen };
+    box.addEventListener("click", () => {
+      if (!box.classList.contains("bad")) return;
+      job.k = 0; job.tries = 0; job.gen = renderGen; box.classList.remove("bad"); loadQ.push(job); pump();
+    });
+    loadQ.push(job); pump();
+  }
+
   /* ---------- photos ---------- */
   function nextPhotoName(p) {              // nom unique, jamais réutilisé (évite les anciennes images en cache)
     const d = new Date(), z = n => pad(n);
@@ -437,19 +491,19 @@
     do { name = `${stamp}-${Math.random().toString(36).slice(2, 5).padEnd(3, "0")}.jpg`; } while (used.has(name));
     return name;
   }
-  async function compress(file) {          // réduit à 2000 px, JPEG qualité 82, supprime EXIF/GPS
+  async function resize(file, maxSide, quality) {   // réduit, JPEG, supprime EXIF/GPS
     const url = URL.createObjectURL(file);
     try {
       const img = await new Promise((ok, ko) => {
         const i = new Image(); i.onload = () => ok(i); i.onerror = () => ko(new Error("format")); i.src = url;
       });
-      const s = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+      const s = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
       const w = Math.max(1, Math.round(img.naturalWidth * s)), hh = Math.max(1, Math.round(img.naturalHeight * s));
       const c = document.createElement("canvas"); c.width = w; c.height = hh;
       const ctx = c.getContext("2d");
       ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, hh);
       ctx.imageSmoothingQuality = "high"; ctx.drawImage(img, 0, 0, w, hh);
-      const blob = await new Promise(r => c.toBlob(r, "image/jpeg", QUALITY));
+      const blob = await new Promise(r => c.toBlob(r, "image/jpeg", quality));
       if (!blob) throw new Error("encodage");
       return blob;
     } finally { URL.revokeObjectURL(url); }
@@ -462,10 +516,13 @@
     for (let i = 0; i < files.length; i++) {
       say($("saveMsg"), `Préparation des photos… ${i + 1}/${files.length}`);
       try {
-        const blob = await compressImpl(files[i]);
+        const blob = await resizeImpl(files[i], MAX_SIDE, QUALITY);
         const name = nextPhotoName(p), path = `${p.folder}/${name}`;
         pending.set(path, { blob });
-        previews.set(path, URL.createObjectURL(blob));
+        let tb = null;
+        try { tb = await resizeImpl(blob, THUMB_SIDE, THUMB_Q); } catch (e) { /* sans miniature : on affichera la photo */ }
+        if (tb) pendingThumbs.set(thumbOfPath(path), { blob: tb });
+        previews.set(path, URL.createObjectURL(tb || blob));
         p.photos.push(name);
       } catch (e) { failed.push(files[i].name || "fichier"); }
     }
@@ -479,8 +536,43 @@
     if (!confirm(`Retirer cette photo (${name}) ?`)) return;
     p.photos.splice(i, 1);
     if (p.cover === name) p.cover = "";
-    if (pending.has(path)) { pending.delete(path); URL.revokeObjectURL(previews.get(path)); previews.delete(path); }
+    pending.delete(path); pendingThumbs.delete(thumbOfPath(path));
+    if (previews.has(path)) { URL.revokeObjectURL(previews.get(path)); previews.delete(path); }
     changed();
+  }
+  function missingThumbs(projects) {      // photos déjà en ligne qui n'ont pas encore de miniature
+    const out = [];
+    projects.forEach(p => p.photos.forEach(name => {
+      const path = `${p.folder}/${name}`, tp = thumbOfPath(path);
+      if (treeKnown && repoFiles.has(path) && !repoFiles.has(tp) && !pendingThumbs.has(tp)) out.push({ path, tp });
+    }));
+    return out;
+  }
+  async function generateThumbs(projects) {
+    const jobs = missingThumbs(projects);
+    if (!jobs.length || busy) return;
+    busy = true; updateSave();
+    let done = 0, failed = 0, next = 0;
+    async function worker() {
+      while (next < jobs.length) {
+        const j = jobs[next++];
+        try {
+          const r = await fetch(encodeURI(j.path));
+          if (!r.ok) throw new Error(r.status);
+          const tb = await resizeImpl(await r.blob(), THUMB_SIDE, THUMB_Q);
+          pendingThumbs.set(j.tp, { blob: tb });
+          if (previews.has(j.path)) URL.revokeObjectURL(previews.get(j.path));
+          previews.set(j.path, URL.createObjectURL(tb));
+        } catch (e) { failed++; }
+        done++; say($("saveMsg"), `Création des miniatures… ${done}/${jobs.length}`);
+      }
+    }
+    await Promise.all([worker(), worker(), worker()]);
+    busy = false; changed();
+    const ok = jobs.length - failed;
+    say($("saveMsg"), failed
+      ? `${plural(ok, "miniature")} créée${ok > 1 ? "s" : ""}, ${failed} en échec. Clique sur « Enregistrer » pour publier les miniatures créées.`
+      : `${plural(ok, "miniature")} créée${ok > 1 ? "s" : ""}. Clique sur « Enregistrer » pour les publier.`, failed ? "err" : "ok");
   }
   function setCover(p, i) { p.cover = p.photos[i]; changed(); }
 
@@ -494,14 +586,23 @@
     ]));
     wrap.appendChild(input);
     wrap.appendChild(h("p", { class: "ph-note", text: "Les photos sont réduites à 2000 px et leurs métadonnées (dont le GPS) sont supprimées avant l'envoi. Sur ordinateur, tu peux aussi les glisser ici." }));
+    const miss = missingThumbs([p]);
+    if (miss.length) wrap.appendChild(h("div", { class: "gen" }, [
+      h("span", { text: `${plural(miss.length, "photo")} sans miniature : l'affichage ici est lent. ` }),
+      btn("Créer les miniatures", "Créer les miniatures de ce projet", () => generateThumbs([p]))
+    ]));
     const grid = h("div", { class: "grid" });
     if (!p.photos.length) grid.appendChild(h("div", { class: "empty-ph", text: "Aucune photo pour l'instant." }));
     const eff = p.cover || p.photos[0];
     p.photos.forEach((name, i) => {
       const path = `${p.folder}/${name}`, isNew = pending.has(path);
-      const img = h("img", { alt: name, loading: "lazy", decoding: "async", src: previews.get(path) || encodeURI(path) });
-      img.addEventListener("error", () => { img.removeAttribute("src"); });
+      const img = h("img", { alt: name, decoding: "async" });
       const im = h("div", { class: "im" }, [img, h("span", { class: "no", text: pad(i + 1) })]);
+      if (previews.has(path)) img.setAttribute("src", previews.get(path));
+      else {
+        const tp = thumbOfPath(path), full = encodeURI(path);
+        loadImage(img, im, repoFiles.has(tp) ? [encodeURI(tp), full] : [full]);
+      }
       if (isNew) im.appendChild(h("span", { class: "bd new", text: "Nouveau" }));
       else if (name === eff) im.appendChild(h("span", { class: "bd", text: "Couverture" }));
       const tile = h("div", { class: "tile" }, [im, h("div", { class: "tb" }, [
@@ -528,7 +629,13 @@
 
   /* ---------- affichage ---------- */
   function render() {
+    renderGen++; loadQ.length = 0;
     const box = $("catList"); box.replaceChildren();
+    const missAll = missingThumbs(allProjects(work));
+    if (missAll.length) box.appendChild(h("div", { class: "gen" }, [
+      h("span", { text: `${plural(missAll.length, "photo")} n'ont pas encore de miniature (affichage lent dans l'admin). Cette opération est à faire une seule fois.` }),
+      h("div", {}, [btn("Créer toutes les miniatures", "Créer les miniatures manquantes de tous les projets", () => generateThumbs(allProjects(work)))])
+    ]));
     const cats = work.categories;
     cats.forEach((cat, ci) => {
       const open = ui.cats.has(cat.id);
@@ -614,12 +721,15 @@
 
     const keptFolders = folders(work), keptPaths = photoPaths(work);
     const delFolders = [...folders(saved.data)].filter(f => !keptFolders.has(f));
-    const delPaths = [...photoPaths(saved.data)].filter(p => !keptPaths.has(p) && !delFolders.some(f => p.startsWith(f + "/")));
-    const uploads = [...pending.entries()].filter(([path]) => keptPaths.has(path)).map(([path, v]) => ({ path, blob: v.blob }));
+    const removedPhotos = [...photoPaths(saved.data)].filter(p => !keptPaths.has(p) && !delFolders.some(f => p.startsWith(f + "/")));
+    const delPaths = removedPhotos.concat(removedPhotos.map(thumbOfPath));
+    const keptThumbs = new Set([...keptPaths].map(thumbOfPath));
+    const photoUploads = [...pending.entries()].filter(([path]) => keptPaths.has(path)).map(([path, v]) => ({ path, blob: v.blob }));
+    const uploads = photoUploads.concat([...pendingThumbs.entries()].filter(([path]) => keptThumbs.has(path)).map(([path, v]) => ({ path, blob: v.blob })));
 
-    if (delFolders.length || delPaths.length) {
+    if (delFolders.length || removedPhotos.length) {
       const names = saved.data.categories.flatMap(c => c.projects).filter(p => delFolders.includes(p.folder)).map(p => `• projet « ${p.title} » et toutes ses photos`);
-      if (delPaths.length) names.push(`• ${plural(delPaths.length, "photo")} retirée${delPaths.length > 1 ? "s" : ""} de projets conservés`);
+      if (removedPhotos.length) names.push(`• ${plural(removedPhotos.length, "photo")} retirée${removedPhotos.length > 1 ? "s" : ""} de projets conservés`);
       if (!confirm(`Ces éléments vont être supprimés définitivement :\n\n${names.join("\n")}\n\nContinuer ?`)) return;
     }
 
@@ -633,15 +743,17 @@
         saved = { data: JSON.parse(text), sha: r.content.sha };
       } else {
         const parts = [];
-        if (uploads.length) parts.push(`ajout de ${plural(uploads.length, "photo")}`);
+        if (photoUploads.length) parts.push(`ajout de ${plural(photoUploads.length, "photo")}`);
+        else if (uploads.length) parts.push("ajout de miniatures");
         if (delFolders.length) parts.push(`suppression de ${plural(delFolders.length, "projet")}`);
-        if (delPaths.length) parts.push(`suppression de ${plural(delPaths.length, "photo")}`);
+        if (removedPhotos.length) parts.push(`suppression de ${plural(removedPhotos.length, "photo")}`);
         await commitChanges({ text, delFolders, delPaths, uploads },
           `Admin : mise à jour du site (${parts.join(", ") || "contenu"})`,
-          (i, n) => say($("saveMsg"), `Envoi des photos… ${i}/${n}`));
+          (i, n) => say($("saveMsg"), `Envoi des fichiers… ${i}/${n}`));
         saved = await fetchSite();
       }
-      pending.clear();                                   // les aperçus locaux restent affichés jusqu'au rechargement
+      pending.clear(); pendingThumbs.clear();            // les aperçus locaux restent affichés jusqu'au rechargement
+      await refreshTree();
       work = clone(saved.data); work.about = work.about || {};
       busy = false; render();
       say($("saveMsg"), "Enregistré. Les changements seront en ligne dans environ une minute.", "ok");
@@ -668,8 +780,8 @@
 
   if (window.__ADMIN_TEST__) window.__ADMIN_TEST__ = {
     connect, save, addCategory, addProject, deleteProject, deleteCategory, moveProject,
-    addPhotos, removePhoto, setCover, slugify, sortableSource, sortableTarget,
-    setCompress: f => { compressImpl = f; },
+    addPhotos, removePhoto, setCover, allProjects, slugify, sortableSource, sortableTarget,
+    setResize: f => { resizeImpl = f; }, generateThumbs, missingThumbs, thumbOfPath, getRepoFiles: () => repoFiles, getThumbs: () => pendingThumbs,
     getWork: () => work, getSaved: () => saved, getPending: () => pending, isDirty, setDrag: d => { drag = d; }, getDrag: () => drag
   };
 })();
