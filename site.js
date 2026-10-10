@@ -9,16 +9,14 @@
     kids.forEach(c => e.appendChild(c));
     return e;
   };
-  const path = (p, file) => `${p.category}/${p.slug}/${file}`;
-  const files = p => p.photos || Array.from({ length: p.count }, (_, i) => `${pad(i + 1)}.${p.ext || "jpg"}`);
-  const cover = p => p.cover || files(p)[0];
-  const byCat = key => PROJECTS.filter(p => p.category === key);
+  const path = (p, file) => `${p.folder}/${file}`;
+  const cover = p => p.cover || p.photos[0];
 
   /* ---------- ACCUEIL ---------- */
-  function renderHome() {
+  function renderHome(data) {
     const wrap = document.getElementById("categories");
-    CATEGORIES.forEach(cat => {
-      const list = byCat(cat.key);
+    data.categories.forEach(cat => {
+      const list = cat.projects;
       if (!list.length) return;
       const grid = el("div", { class: "project-grid" });
       list.forEach(p => {
@@ -32,7 +30,7 @@
           el("div", {}, [el("strong", { text: p.title })])
         ]));
       });
-      wrap.appendChild(el("section", { class: "category", id: cat.key }, [
+      wrap.appendChild(el("section", { class: "category", id: cat.id }, [
         el("div", { class: "category-title" }, [
           el("h3", { text: cat.label })
         ]),
@@ -42,22 +40,22 @@
   }
 
   /* ---------- PAGE PROJET ---------- */
-  function renderProject() {
+  function renderProject(data) {
     const slug = new URLSearchParams(location.search).get("p");
-    const p = PROJECTS.find(x => x.slug === slug);
+    let cat = null, p = null;
+    data.categories.forEach(c => c.projects.forEach(x => { if (x.slug === slug) { cat = c; p = x; } }));
     const head = document.getElementById("head");
     const gal = document.getElementById("gallery");
     if (!p) {
       head.appendChild(el("h1", { text: "Project not found" }));
       return;
     }
-    const cat = CATEGORIES.find(c => c.key === p.category);
-    document.title = `${p.title} — Lucas Trouessin`;
+    document.title = `${p.title} — ${(data.site && data.site.name) || "Lucas Trouessin"}`;
     head.appendChild(el("span", { class: "kicker", text: cat.label }));
     head.appendChild(el("h1", { text: p.title }));
     if (p.description) head.appendChild(el("p", { text: p.description }));
 
-    const list = files(p);
+    const list = p.photos;
     const loaded = [];           // urls réellement chargées
     let failed = 0;
     list.forEach((f, i) => {
@@ -70,7 +68,7 @@
       img.onerror = () => {
         fig.remove();
         if (++failed === list.length) {
-          gal.appendChild(el("p", { class: "empty", text: `No photos yet — add them to ${p.category}/${p.slug}/` }));
+          gal.appendChild(el("p", { class: "empty", text: `No photos yet — add them to ${p.folder}/` }));
         }
       };
       img.src = path(p, f);
@@ -82,10 +80,10 @@
     });
 
     // projet précédent / suivant dans la même catégorie
-    const sib = byCat(p.category), idx = sib.findIndex(x => x.slug === p.slug);
+    const sib = cat.projects, idx = sib.findIndex(x => x.slug === p.slug);
     const pager = document.getElementById("pager");
     const link = (q, label) => el("a", { href: `project.html?p=${encodeURIComponent(q.slug)}`, text: label });
-    pager.appendChild(idx > 0 ? link(sib[idx - 1], `← ${sib[idx - 1].title}`) : el("a", { href: "index.html#" + p.category, text: "← Back" }));
+    pager.appendChild(idx > 0 ? link(sib[idx - 1], `← ${sib[idx - 1].title}`) : el("a", { href: "index.html#" + cat.id, text: "← Back" }));
     pager.appendChild(idx < sib.length - 1 ? link(sib[idx + 1], `${sib[idx + 1].title} →`) : el("span"));
   }
 
@@ -137,9 +135,31 @@
   }
   function closeLb() { lb.classList.remove("open"); document.body.style.overflow = ""; }
 
+  /* ---------- À PROPOS (texte + email) ---------- */
+  function renderAbout(data) {
+    const a = data.about || {};
+    const p = document.querySelector(".about p");
+    const c = document.querySelector("a.contact");
+    if (p && a.text) p.textContent = a.text;
+    if (c && a.email) {
+      c.href = `mailto:${a.email}`;
+      c.textContent = `${a.email} ↗`;
+    }
+  }
+
+  /* ---------- CHARGEMENT DES DONNÉES (site.json) ---------- */
   const page = document.body.dataset.page;
-  if (page === "home") renderHome();
-  if (page === "project") renderProject();
+  fetch("site.json", { cache: "no-cache" })
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(data => {
+      if (page === "home") { renderHome(data); renderAbout(data); }
+      if (page === "project") renderProject(data);
+    })
+    .catch(err => {
+      console.error("Impossible de charger site.json", err);
+      const m = document.querySelector("main");
+      if (m) m.appendChild(el("p", { class: "empty", text: "Unable to load the content." }));
+    });
 
   /* ---------- ANNÉE DU COPYRIGHT ---------- */
   const year = document.getElementById("current-year");
