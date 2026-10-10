@@ -87,6 +87,15 @@
   .gen button{margin-top:10px}
   .empty-ph{color:var(--muted);font-size:13px;padding:14px 0}
 
+  /* filigrane */
+  .wm-set{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:6px}
+  .wm-set select{width:100%}
+  .wm-set input[type=range]{width:100%;margin:10px 0 0;accent-color:var(--fg)}
+  .wm-prev-box{margin-top:20px}
+  .wm-prev{width:380px;max-width:100%;aspect-ratio:3/2;background:linear-gradient(160deg,#d9b48b 0%,#a7826a 45%,#3f4a59 100%)}
+  .wm-off .wm{display:none}
+  .wm-off .wm-prev{opacity:.5}
+
   .savebar{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:6px 20px 14px;margin:24px -20px 0;z-index:3}
   .savebar .msg{margin-top:10px}
 </style>
@@ -136,6 +145,10 @@
     <div id="aboutText"></div>
     <label class="f">Email de contact</label>
     <div id="aboutEmail"></div>
+
+    <h2 style="margin-top:44px">Filigrane</h2>
+    <p class="lead" style="margin-bottom:6px">Le logo « LT » posé dans le coin de chaque photo du site (accueil, galeries, visionneuse).</p>
+    <div id="wmBox"></div>
 
     <div class="savebar">
       <button id="save" disabled style="margin-top:12px">Enregistrer</button><button id="logout" class="ghost" style="margin-top:12px">Se déconnecter</button>
@@ -709,6 +722,50 @@
     });
     $("aboutText").replaceChildren(editable({ label: "texte About", multiline: true, get: () => work.about.text || "", set: v => { work.about.text = v; }, onChange: updateSave, placeholder: "Ajouter un texte…" }));
     $("aboutEmail").replaceChildren(editable({ label: "email de contact", type: "email", get: () => work.about.email || "", set: v => { work.about.email = v; }, onChange: updateSave, placeholder: "Ajouter un email…" }));
+    $("wmBox").replaceChildren(watermarkSection());
+  }
+
+  /* ---------- filigrane ---------- */
+  const WM_DEFAULT = { enabled: false, color: "light", size: "m", position: "right", opacity: 0.8 };
+  const MARK_SVG = '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-linecap="square">'
+    + '<path stroke-width="2.5" d="M8 26V8h18M74 8h18v18M92 74v18H74M26 92H8V74"/>'
+    + '<path stroke-width="3.2" d="M35 26v38h15M50 38h24M62 38v38"/></svg>';
+  const wmGet = () => Object.assign({}, WM_DEFAULT, work.watermark || {});
+  function wmSet(k, v) { work.watermark = Object.assign(wmGet(), { [k]: v }); updateSave(); say($("saveMsg"), ""); }
+  function watermarkSection() {
+    const w = wmGet();
+    const mark = h("span", { "aria-hidden": "true" });
+    mark.innerHTML = MARK_SVG;
+    const wrap = h("div", { class: "wm-wrap" }, [h("div", { class: "wm-prev" }), mark]);
+    const box = h("div", {});
+    const paint = () => {
+      const c = wmGet();
+      mark.className = ["wm", c.color === "dark" ? "dark" : "light", c.size, c.position === "left" ? "left" : "right"].join(" ");
+      mark.style.opacity = c.opacity;
+      box.classList.toggle("wm-off", !c.enabled);
+    };
+    const sel = (label, key, opts) => h("div", {}, [
+      h("label", { class: "f", text: label }),
+      h("select", { "aria-label": label, onchange: e => { wmSet(key, e.target.value); paint(); } },
+        opts.map(([v, t]) => h("option", { value: v, text: t, selected: w[key] === v })))
+    ]);
+    const pct = h("span", { text: ` · ${Math.round(w.opacity * 100)} %` });
+    const range = h("input", { type: "range", min: "0.2", max: "1", step: "0.05", value: String(w.opacity), "aria-label": "Opacité du filigrane" });
+    range.addEventListener("input", () => { wmSet("opacity", +range.value); pct.textContent = ` · ${Math.round(range.value * 100)} %`; paint(); });
+    const chk = h("input", { type: "checkbox", checked: !!w.enabled });
+    chk.addEventListener("change", () => { wmSet("enabled", chk.checked); paint(); });
+    box.append(
+      h("label", { class: "check" }, [chk, h("span", { text: "Afficher le filigrane sur les photos" })]),
+      h("div", { class: "wm-set" }, [
+        sel("Couleur", "color", [["light", "Blanc"], ["dark", "Noir"]]),
+        sel("Taille", "size", [["s", "Petit"], ["m", "Moyen"], ["l", "Grand"]]),
+        sel("Position", "position", [["right", "En bas à droite"], ["left", "En bas à gauche"]]),
+        h("div", {}, [h("label", { class: "f" }, [h("span", { text: "Opacité" }), pct]), range])
+      ]),
+      h("div", { class: "wm-prev-box" }, [h("label", { class: "f", text: "Aperçu" }), wrap])
+    );
+    paint();
+    return box;
   }
 
   /* ---------- enregistrement ---------- */

@@ -9,6 +9,31 @@
     kids.forEach(c => e.appendChild(c));
     return e;
   };
+  /* ---------- FILIGRANE ---------- */
+  const MARK_SVG = '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-linecap="square">'
+    + '<path stroke-width="2.5" d="M8 26V8h18M74 8h18v18M92 74v18H74M26 92H8V74"/>'
+    + '<path stroke-width="3.2" d="M35 26v38h15M50 38h24M62 38v38"/></svg>';
+  let WM = null;                                   // réglages actifs (null = pas de filigrane)
+  function setWatermark(data) {
+    const w = data.watermark;
+    if (!w || !w.enabled) { WM = null; return; }
+    const op = Number(w.opacity);
+    WM = {
+      cls: ["wm", w.color === "dark" ? "dark" : "light", ["s", "m", "l"].includes(w.size) ? w.size : "m", w.position === "left" ? "left" : "right"].join(" "),
+      opacity: op >= 0.1 && op <= 1 ? op : 0.8
+    };
+  }
+  function withMark(img) {                         // enveloppe l'image et pose le filigrane dans son coin
+    if (!WM) return img;
+    const wrap = el("span", { class: "wm-wrap" });
+    const mark = el("span", { class: WM.cls, "aria-hidden": "true" });
+    mark.style.opacity = WM.opacity;
+    mark.innerHTML = MARK_SVG;
+    if (img.parentNode) img.parentNode.replaceChild(wrap, img);
+    wrap.appendChild(img); wrap.appendChild(mark);
+    return wrap;
+  }
+
   const path = (p, file) => `${p.folder}/${file}`;
   const cover = p => p.cover || p.photos[0];
 
@@ -23,7 +48,7 @@
         const box = el("div", { class: "project-image placeholder" }, [el("span", { text: p.title.toUpperCase() })]);
         const img = new Image();
         img.alt = p.title;
-        img.onload = () => { box.className = "project-image"; box.replaceChildren(img); };
+        img.onload = () => { box.className = "project-image"; box.replaceChildren(withMark(img)); };
         if (cover(p)) img.src = path(p, cover(p));
         grid.appendChild(el("a", { class: "project", href: `project.html?p=${encodeURIComponent(p.slug)}` }, [
           box,
@@ -76,7 +101,7 @@
       const open = () => openLightbox(gal.querySelectorAll("img"), img);
       img.addEventListener("click", open);
       img.addEventListener("keydown", e => { if (e.key === "Enter") open(); });
-      fig.appendChild(img);
+      fig.appendChild(withMark(img));
       gal.appendChild(fig);
     });
 
@@ -95,7 +120,7 @@
     lbCount = el("span", { class: "count" });
     const mk = (cls, label, txt, fn) => { const b = el("button", { class: cls, "aria-label": label, text: txt }); b.onclick = fn; return b; };
     lb = el("div", { class: "lb", role: "dialog", "aria-modal": "true", "aria-label": "Photo viewer" }, [
-      lbImg, lbCount,
+      withMark(lbImg), lbCount,
       mk("x", "Close", "Close", closeLb), mk("prev", "Previous photo", "Prev", () => go(-1)), mk("next", "Next photo", "Next", () => go(1))
     ]);
     // Clic sur la photo : photo suivante (s'arrête à la dernière). Le fond blanc ne ferme rien.
@@ -153,7 +178,15 @@
   fetch("site.json", { cache: "no-cache" })
     .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(data => {
-      if (page === "home") { renderHome(data); renderAbout(data); }
+      setWatermark(data);
+      if (page === "home") {
+        const hero = document.querySelector(".hero-image img");
+        if (hero && WM) {
+          if (hero.complete && hero.naturalWidth) withMark(hero);
+          else hero.addEventListener("load", () => withMark(hero), { once: true });
+        }
+        renderHome(data); renderAbout(data);
+      }
       if (page === "project") renderProject(data);
     })
     .catch(err => {

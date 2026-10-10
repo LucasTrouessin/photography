@@ -74,3 +74,18 @@ img{-webkit-user-drag:none;user-select:none;-webkit-user-select:none;-webkit-tou
   .lb .prev{left:6px}.lb .next{right:6px}
   .lb .count{left:50%;transform:translateX(-50%);bottom:26px}
 }
+
+/* ---- Filigrane (réglé dans l'admin, bloc "watermark" de site.json) ---- */
+.wm-wrap{position:relative;display:inline-block;max-width:100%;line-height:0;vertical-align:top}
+.gallery .wm-wrap{display:block}
+.hero-image{text-align:center}
+.hero-image .wm-wrap img{width:auto;max-width:100%}
+.wm{position:absolute;right:0;bottom:0;margin:0 3% 3% 0;width:7%;min-width:24px;max-width:76px;color:#fff;pointer-events:none;user-select:none}
+.wm.s{width:5%;min-width:20px;max-width:56px}
+.wm.l{width:10%;min-width:30px;max-width:104px}
+.wm.left{right:auto;left:0;margin:0 0 3% 3%}
+.wm.dark{color:#151515}
+.wm svg{display:block;width:100%;height:auto;overflow:visible}
+.wm.light svg{filter:drop-shadow(0 0 1.5px rgba(0,0,0,.45))}
+.wm.dark svg{filter:drop-shadow(0 0 1.5px rgba(255,255,255,.4))}
+@media(max-width:700px){.project-image .wm-wrap{display:block}}

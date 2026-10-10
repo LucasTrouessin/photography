@@ -6,6 +6,13 @@
     "text": "I bumped into cameras through film production. As a camera operator in different short movies, I had the chance to learn how to work on composition and light. I quickly fell in love with the power of still images and got myself a camera. This is a small collection of mostly portraits I’ve done in recent years.",
     "email": "lucas.trouessin@gmail.com"
   },
+  "watermark": {
+    "enabled": true,
+    "color": "light",
+    "size": "m",
+    "position": "right",
+    "opacity": 0.8
+  },
   "categories": [
     {
       "id": "portraits",
