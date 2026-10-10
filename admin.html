@@ -102,7 +102,9 @@
   .adm details.fold summary::-webkit-details-marker{display:none}
   .adm details.fold summary .chev{width:14px;color:var(--muted);font-size:14px}
   .adm details.fold[open] summary .chev{transform:rotate(90deg)}
+  .adm details.fold + details.fold{margin-top:12px}
   .fold-body{padding:0 16px 20px}
+  .fold-body > label.f:first-child{margin-top:0}
 
   /* accueil */
   .hero-pv{display:block;max-width:100%;max-height:220px;background:#e4e1da;margin-top:4px}
@@ -166,18 +168,26 @@
       <button id="addCat" class="sm" type="button">Ajouter</button>
     </div>
 
-    <h2 style="margin-top:44px">Page d'accueil</h2>
-    <label class="f">Texte sous la grande photo</label>
-    <p class="ph-note" style="margin:0">Entrée = retour à la ligne · Ctrl+Entrée ou cliquer ailleurs pour valider.</p>
-    <div id="heroTitle"></div>
-    <label class="f">Grande photo</label>
-    <div id="heroImg"></div>
+    <details class="fold">
+      <summary><span class="chev" aria-hidden="true">▸</span>Page d'accueil</summary>
+      <div class="fold-body">
+        <label class="f">Texte sous la grande photo</label>
+        <p class="ph-note" style="margin:0">Entrée = retour à la ligne · Ctrl+Entrée ou cliquer ailleurs pour valider.</p>
+        <div id="heroTitle"></div>
+        <label class="f">Grande photo</label>
+        <div id="heroImg"></div>
+      </div>
+    </details>
 
-    <h2 style="margin-top:44px">À propos et contact</h2>
-    <label class="f">Texte « About »</label>
-    <div id="aboutText"></div>
-    <label class="f">Email de contact</label>
-    <div id="aboutEmail"></div>
+    <details class="fold">
+      <summary><span class="chev" aria-hidden="true">▸</span>À propos et contact</summary>
+      <div class="fold-body">
+        <label class="f">Texte « About »</label>
+        <div id="aboutText"></div>
+        <label class="f">Email de contact</label>
+        <div id="aboutEmail"></div>
+      </div>
+    </details>
 
     <details class="fold">
       <summary><span class="chev" aria-hidden="true">▸</span>Filigrane</summary>
