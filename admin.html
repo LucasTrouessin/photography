@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Administration</title>
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<style>
+  .adm{max-width:640px;margin:0 auto;padding:40px 20px 80px}
+  .adm h1{font-size:clamp(28px,6vw,44px);margin-bottom:8px}
+  .adm .lead{color:var(--muted);line-height:1.6;margin:0 0 36px}
+  .adm section{border-top:1px solid var(--line);padding:22px 0 30px}
+  .adm h2{font-size:18px;font-weight:500;letter-spacing:-.02em;margin:0 0 18px}
+  .adm label{display:block;font:11px "DM Mono",monospace;text-transform:uppercase;color:var(--muted);margin:16px 0 6px}
+  .adm input[type=text],.adm input[type=email],.adm input[type=password],.adm textarea{width:100%;font:inherit;font-size:16px;padding:12px;border:1px solid var(--line);background:#fff;color:var(--fg);border-radius:0}
+  .adm textarea{min-height:110px;resize:vertical;line-height:1.45}
+  .adm .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .adm .check{display:flex;gap:10px;align-items:center;margin:18px 0 0;font:inherit;text-transform:none;color:var(--fg)}
+  .adm button{font:11px "DM Mono",monospace;text-transform:uppercase;letter-spacing:.06em;padding:14px 22px;border:1px solid var(--fg);background:var(--fg);color:var(--bg);cursor:pointer;margin-top:22px}
+  .adm button.ghost{background:none;color:var(--fg);margin-left:8px}
+  .adm button:disabled{opacity:.45;cursor:default}
+  .adm .msg{margin-top:18px;line-height:1.5;min-height:1.5em}
+  .adm .msg.err{color:#a3261c}.adm .msg.ok{color:#2c6b3a}
+  .adm details{margin-top:16px;color:var(--muted);line-height:1.6}
+  .adm summary{cursor:pointer;color:var(--fg)}
+  .adm ol{padding-left:20px;margin:10px 0 0}
+  .adm .hidden{display:none}
+  .adm .top{display:flex;justify-content:space-between;align-items:baseline}
+  .adm .top a{font:11px "DM Mono",monospace;text-transform:uppercase;color:inherit}
+</style>
+</head>
+<body>
+<main class="adm">
+  <div class="top"><span class="brand">ADMINISTRATION</span><a href="index.html">← Voir le site</a></div>
+  <h1 style="margin-top:34px">Gérer le site</h1>
+  <p class="lead">Les modifications sont enregistrées directement sur le site. Elles apparaissent en ligne environ une minute après l'enregistrement.</p>
+
+  <!-- CONNEXION -->
+  <section id="login">
+    <h2>Connexion</h2>
+    <div class="row">
+      <div><label for="owner">Compte GitHub</label><input id="owner" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      <div><label for="repo">Dépôt</label><input id="repo" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+    </div>
+    <label for="branch">Branche</label><input id="branch" type="text" value="main" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <label for="token">Jeton d'accès</label><input id="token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <label class="check"><input id="remember" type="checkbox"> Se souvenir du jeton sur cet appareil</label>
+    <button id="connect">Se connecter</button>
+    <div id="loginMsg" class="msg" role="status"></div>
+    <details>
+      <summary>Comment obtenir un jeton ?</summary>
+      <ol>
+        <li>Sur github.com : photo de profil → <b>Settings</b> → <b>Developer settings</b> → <b>Personal access tokens</b> → <b>Fine-grained tokens</b> → <b>Generate new token</b>.</li>
+        <li><b>Repository access</b> : « Only select repositories », puis choisis le dépôt du site.</li>
+        <li><b>Permissions</b> → <b>Repository permissions</b> → <b>Contents</b> : « Read and write ».</li>
+        <li>Choisis une durée d'expiration, valide, et copie le jeton (il ne s'affiche qu'une fois).</li>
+      </ol>
+      <p>Le jeton est comme un mot de passe : ne le partage pas. Ne coche « se souvenir » que sur un appareil personnel.</p>
+    </details>
+  </section>
+
+  <!-- ÉDITION -->
+  <section id="editor" class="hidden">
+    <h2>À propos et contact</h2>
+    <label for="aboutText">Texte « About »</label>
+    <textarea id="aboutText"></textarea>
+    <label for="aboutEmail">Email de contact</label>
+    <input id="aboutEmail" type="email" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <button id="save" disabled>Enregistrer</button><button id="logout" class="ghost">Se déconnecter</button>
+    <div id="saveMsg" class="msg" role="status"></div>
+  </section>
+</main>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const CONN_KEY = "admin-conn";           // compte / dépôt / branche (pas secret)
+  const TOKEN_KEY = "admin-token";         // seulement si « se souvenir » est coché
+  let conn = null;                         // { owner, repo, branch, token }
+  let state = null;                        // { data, sha } : site.json tel que chargé
+  let dirty = false;
+
+  /* ---------- utilitaires ---------- */
+  function b64enc(str) {                   // texte UTF-8 (accents) -> base64
+    const bytes = new TextEncoder().encode(str);
+    let bin = ""; bytes.forEach(b => bin += String.fromCharCode(b));
+    return btoa(bin);
+  }
+  function b64dec(b64) {                   // base64 -> texte UTF-8
+    const bin = atob(b64.replace(/\s/g, ""));
+    return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
+  }
+  function serialize(data) {               // JSON lisible, listes de photos sur une ligne
+    return JSON.stringify(data, null, 2).replace(/"photos": \[([\s\S]*?)\]/g,
+      (m, inner) => '"photos": [' + (inner.match(/"[^"]*"/g) || []).join(", ") + "]") + "\n";
+  }
+  function say(el, text, kind) { el.textContent = text; el.className = "msg" + (kind ? " " + kind : ""); }
+
+  async function gh(method, path, body) {
+    const url = `https://api.github.com/repos/${encodeURIComponent(conn.owner)}/${encodeURIComponent(conn.repo)}/${path}`;
+    let res;
+    try {
+      res = await fetch(url, {
+        method, cache: "no-store",
+        headers: Object.assign({
+          Authorization: `Bearer ${conn.token}`,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28"
+        }, body ? { "Content-Type": "application/json" } : {}),
+        body: body ? JSON.stringify(body) : undefined
+      });
+    } catch (e) {
+      throw new Error("Connexion impossible. Vérifie ta connexion internet.");
+    }
+    if (!res.ok) {
+      const map = {
+        401: "Jeton invalide ou expiré.",
+        403: "Accès refusé : le jeton n'a pas la permission « Contents : Read and write ».",
+        404: "Dépôt, branche ou fichier introuvable. Vérifie le compte, le dépôt et que le jeton couvre bien ce dépôt.",
+        409: "Le site a été modifié ailleurs entre-temps. Recharge la page puis refais ta modification.",
+        422: "Le site a été modifié ailleurs entre-temps. Recharge la page puis refais ta modification."
+      };
+      throw new Error(map[res.status] || `Erreur GitHub (${res.status}).`);
+    }
+    return res.json();
+  }
+
+  /* ---------- connexion ---------- */
+  async function connect() {
+    conn = {
+      owner: $("owner").value.trim(), repo: $("repo").value.trim(),
+      branch: $("branch").value.trim() || "main", token: $("token").value.trim()
+    };
+    if (!conn.owner || !conn.repo || !conn.token) {
+      say($("loginMsg"), "Remplis le compte, le dépôt et le jeton.", "err"); return;
+    }
+    $("connect").disabled = true; say($("loginMsg"), "Connexion…");
+    try {
+      const f = await gh("GET", `contents/site.json?ref=${encodeURIComponent(conn.branch)}`);
+      if (!f.content) throw new Error("site.json est trop volumineux pour cette interface.");
+      state = { data: JSON.parse(b64dec(f.content)), sha: f.sha };
+      localStorage.setItem(CONN_KEY, JSON.stringify({ owner: conn.owner, repo: conn.repo, branch: conn.branch }));
+      if ($("remember").checked) localStorage.setItem(TOKEN_KEY, conn.token);
+      else localStorage.removeItem(TOKEN_KEY);
+      showEditor();
+    } catch (e) {
+      conn = null; say($("loginMsg"), e.message, "err");
+    }
+    $("connect").disabled = false;
+  }
+
+  function showEditor() {
+    const about = state.data.about || {};
+    $("aboutText").value = about.text || "";
+    $("aboutEmail").value = about.email || "";
+    $("login").classList.add("hidden");
+    $("editor").classList.remove("hidden");
+    $("save").disabled = true; dirty = false;
+    say($("saveMsg"), "");
+  }
+
+  function logout() {
+    localStorage.removeItem(TOKEN_KEY);
+    conn = null; state = null; dirty = false;
+    $("token").value = "";
+    $("editor").classList.add("hidden");
+    $("login").classList.remove("hidden");
+    say($("loginMsg"), "");
+  }
+
+  /* ---------- enregistrement ---------- */
+  function markDirty() { dirty = true; $("save").disabled = false; say($("saveMsg"), ""); }
+
+  async function save() {
+    const text = $("aboutText").value.trim();
+    const email = $("aboutEmail").value.trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      say($("saveMsg"), "L'adresse email n'a pas l'air valide.", "err"); return;
+    }
+    const next = JSON.parse(JSON.stringify(state.data));
+    next.about = Object.assign({}, next.about, { text, email });
+    $("save").disabled = true; say($("saveMsg"), "Enregistrement…");
+    try {
+      const r = await gh("PUT", "contents/site.json", {
+        message: "Admin : mise à jour de À propos / contact",
+        content: b64enc(serialize(next)),
+        sha: state.sha,
+        branch: conn.branch
+      });
+      state = { data: next, sha: r.content.sha };
+      dirty = false;
+      say($("saveMsg"), "Enregistré. Les changements seront en ligne dans environ une minute.", "ok");
+    } catch (e) {
+      $("save").disabled = false; say($("saveMsg"), e.message, "err");
+    }
+  }
+
+  /* ---------- démarrage ---------- */
+  $("connect").addEventListener("click", connect);
+  $("logout").addEventListener("click", logout);
+  $("save").addEventListener("click", save);
+  $("aboutText").addEventListener("input", markDirty);
+  $("aboutEmail").addEventListener("input", markDirty);
+  window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+  try {
+    const c = JSON.parse(localStorage.getItem(CONN_KEY) || "null");
+    if (c) { $("owner").value = c.owner; $("repo").value = c.repo; $("branch").value = c.branch || "main"; }
+    const t = localStorage.getItem(TOKEN_KEY);
+    if (t) { $("token").value = t; $("remember").checked = true; if (c) connect(); }
+  } catch (e) { /* stockage indisponible : on continue sans */ }
+})();
+</script>
+</body>
+</html>
