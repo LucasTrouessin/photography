@@ -29,6 +29,23 @@
   .adm .hidden{display:none}
   .adm .top{display:flex;justify-content:space-between;align-items:baseline}
   .adm .top a{font:11px "DM Mono",monospace;text-transform:uppercase;color:inherit}
+
+  .adm .cat{border:1px solid var(--line);padding:16px;margin:0 0 22px;background:rgba(255,255,255,.45)}
+  .adm .cat-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .adm .cat-head input{flex:1;min-width:160px;font-size:18px}
+  .adm .proj{border-top:1px solid var(--line);padding:14px 0 6px;margin-top:14px}
+  .adm .proj input+input{margin-top:8px}
+  .adm .meta{font:10px "DM Mono",monospace;color:var(--muted);margin:8px 0 0;text-transform:uppercase}
+  .adm .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center}
+  .adm button.sm{padding:9px 12px;margin:0;font-size:10px}
+  .adm button.danger{background:none;color:#a3261c;border-color:#a3261c}
+  .adm select{font:inherit;font-size:14px;padding:8px;border:1px solid var(--line);background:#fff;color:var(--fg);border-radius:0}
+  .adm .add-row{display:flex;gap:8px;margin-top:16px}
+  .adm .add-row input{flex:1;min-width:0}
+  .adm .add-row button{margin:0}
+  .adm .savebar{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:6px 0 14px;margin-top:24px}
+  .adm .savebar .msg{margin-top:10px}
+  .adm h3{font:11px "DM Mono",monospace;text-transform:uppercase;color:var(--muted);margin:34px 0 14px;font-weight:400}
 </style>
 </head>
 <body>
@@ -68,8 +85,19 @@
     <textarea id="aboutText"></textarea>
     <label for="aboutEmail">Email de contact</label>
     <input id="aboutEmail" type="email" autocomplete="off" autocapitalize="off" spellcheck="false">
-    <button id="save" disabled>Enregistrer</button><button id="logout" class="ghost">Se déconnecter</button>
-    <div id="saveMsg" class="msg" role="status"></div>
+
+    <h3>Catégories et projets</h3>
+    <p class="lead" style="margin-bottom:18px">L'ordre affiché ici est l'ordre du site. Les adresses des projets ne changent pas quand tu renommes un titre. Rien n'est appliqué tant que tu n'as pas cliqué sur « Enregistrer ».</p>
+    <div id="catList"></div>
+    <div class="add-row">
+      <input id="newCat" type="text" placeholder="Nouvelle catégorie" autocomplete="off">
+      <button id="addCat" class="sm" type="button">Ajouter</button>
+    </div>
+
+    <div class="savebar">
+      <button id="save" disabled>Enregistrer</button><button id="logout" class="ghost">Se déconnecter</button>
+      <div id="saveMsg" class="msg" role="status"></div>
+    </div>
   </section>
 </main>
 
@@ -78,11 +106,13 @@
   const $ = id => document.getElementById(id);
   const CONN_KEY = "admin-conn";           // compte / dépôt / branche (pas secret)
   const TOKEN_KEY = "admin-token";         // seulement si « se souvenir » est coché
+  const CONFLICT = "Le site a été modifié ailleurs entre-temps. Recharge la page puis refais ta modification.";
   let conn = null;                         // { owner, repo, branch, token }
-  let state = null;                        // { data, sha } : site.json tel que chargé
-  let dirty = false;
+  let saved = null;                        // { data, sha } : site.json tel qu'il est sur GitHub
+  let work = null;                         // copie en cours d'édition
 
   /* ---------- utilitaires ---------- */
+  const clone = o => JSON.parse(JSON.stringify(o));
   function b64enc(str) {                   // texte UTF-8 (accents) -> base64
     const bytes = new TextEncoder().encode(str);
     let bin = ""; bytes.forEach(b => bin += String.fromCharCode(b));
@@ -97,7 +127,33 @@
       (m, inner) => '"photos": [' + (inner.match(/"[^"]*"/g) || []).join(", ") + "]") + "\n";
   }
   function say(el, text, kind) { el.textContent = text; el.className = "msg" + (kind ? " " + kind : ""); }
+  function h(tag, attrs, kids) {
+    const e = document.createElement(tag);
+    for (const k in (attrs || {})) {
+      const v = attrs[k];
+      if (v === false || v === null || v === undefined) continue;
+      if (k === "text") e.textContent = v;
+      else if (k === "value") e.value = v;
+      else if (k.slice(0, 2) === "on") e.addEventListener(k.slice(2), v);
+      else e.setAttribute(k, v === true ? "" : v);
+    }
+    (kids || []).forEach(c => e.appendChild(c));
+    return e;
+  }
+  const btn = (text, aria, fn, disabled, cls) =>
+    h("button", { type: "button", class: "sm " + (cls || ""), "aria-label": aria, text, onclick: fn, disabled: !!disabled });
+  const slugify = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  function unique(base, used) {            // used : ensemble de valeurs en minuscules
+    let v = base, i = 2;
+    while (used.has(v.toLowerCase())) v = `${base}-${i++}`;
+    return v;
+  }
+  const allProjects = d => d.categories.flatMap(c => c.projects);
+  const folders = d => new Set(allProjects(d).map(p => p.folder));
+  const isDirty = () => !!(saved && work) && serialize(work) !== serialize(saved.data);
 
+  /* ---------- accès GitHub ---------- */
   async function gh(method, path, body) {
     const url = `https://api.github.com/repos/${encodeURIComponent(conn.owner)}/${encodeURIComponent(conn.repo)}/${path}`;
     let res;
@@ -119,12 +175,40 @@
         401: "Jeton invalide ou expiré.",
         403: "Accès refusé : le jeton n'a pas la permission « Contents : Read and write ».",
         404: "Dépôt, branche ou fichier introuvable. Vérifie le compte, le dépôt et que le jeton couvre bien ce dépôt.",
-        409: "Le site a été modifié ailleurs entre-temps. Recharge la page puis refais ta modification.",
-        422: "Le site a été modifié ailleurs entre-temps. Recharge la page puis refais ta modification."
+        409: CONFLICT,
+        422: CONFLICT
       };
       throw new Error(map[res.status] || `Erreur GitHub (${res.status}).`);
     }
     return res.json();
+  }
+
+  // Un seul commit : met à jour site.json ET supprime les dossiers de photos retirés.
+  async function commitWithDeletes(text, delFolders, message) {
+    const br = encodeURI(conn.branch);
+    const ref = await gh("GET", `git/ref/heads/${br}`);
+    const headSha = ref.object.sha;
+    const head = await gh("GET", `git/commits/${headSha}`);
+    const treeSha = head.tree.sha;
+    const tree = await gh("GET", `git/trees/${treeSha}?recursive=1`);
+    if (tree.truncated) throw new Error("Le dépôt est trop volumineux pour cette opération.");
+    const cur = tree.tree.find(t => t.path === "site.json");
+    if (!cur || cur.sha !== saved.sha) throw new Error(CONFLICT);
+    const entries = [{ path: "site.json", mode: "100644", type: "blob", content: text }];
+    tree.tree.forEach(t => {
+      if (t.type === "blob" && delFolders.some(f => t.path.startsWith(f + "/")))
+        entries.push({ path: t.path, mode: "100644", type: "blob", sha: null });
+    });
+    const nt = await gh("POST", "git/trees", { base_tree: treeSha, tree: entries });
+    const nc = await gh("POST", "git/commits", { message, tree: nt.sha, parents: [headSha] });
+    await gh("PATCH", `git/refs/heads/${br}`, { sha: nc.sha });
+    return entries.length - 1;             // nombre de fichiers supprimés
+  }
+
+  async function fetchSite() {
+    const f = await gh("GET", `contents/site.json?ref=${encodeURIComponent(conn.branch)}`);
+    if (!f.content) throw new Error("site.json est trop volumineux pour cette interface.");
+    return { data: JSON.parse(b64dec(f.content)), sha: f.sha };
   }
 
   /* ---------- connexion ---------- */
@@ -138,9 +222,7 @@
     }
     $("connect").disabled = true; say($("loginMsg"), "Connexion…");
     try {
-      const f = await gh("GET", `contents/site.json?ref=${encodeURIComponent(conn.branch)}`);
-      if (!f.content) throw new Error("site.json est trop volumineux pour cette interface.");
-      state = { data: JSON.parse(b64dec(f.content)), sha: f.sha };
+      saved = await fetchSite();
       localStorage.setItem(CONN_KEY, JSON.stringify({ owner: conn.owner, repo: conn.repo, branch: conn.branch }));
       if ($("remember").checked) localStorage.setItem(TOKEN_KEY, conn.token);
       else localStorage.removeItem(TOKEN_KEY);
@@ -152,58 +234,148 @@
   }
 
   function showEditor() {
-    const about = state.data.about || {};
-    $("aboutText").value = about.text || "";
-    $("aboutEmail").value = about.email || "";
+    work = clone(saved.data);
+    work.about = work.about || {};
+    $("aboutText").value = work.about.text || "";
+    $("aboutEmail").value = work.about.email || "";
     $("login").classList.add("hidden");
     $("editor").classList.remove("hidden");
-    $("save").disabled = true; dirty = false;
-    say($("saveMsg"), "");
+    render(); updateSave(); say($("saveMsg"), "");
   }
 
   function logout() {
     localStorage.removeItem(TOKEN_KEY);
-    conn = null; state = null; dirty = false;
+    conn = null; saved = null; work = null;
     $("token").value = "";
     $("editor").classList.add("hidden");
     $("login").classList.remove("hidden");
     say($("loginMsg"), "");
   }
 
-  /* ---------- enregistrement ---------- */
-  function markDirty() { dirty = true; $("save").disabled = false; say($("saveMsg"), ""); }
+  /* ---------- édition (en mémoire, rien n'est envoyé avant « Enregistrer ») ---------- */
+  function updateSave() { $("save").disabled = !isDirty(); }
+  function changed() { render(); updateSave(); say($("saveMsg"), ""); }
+  function swap(arr, i, d) { const j = i + d; if (j < 0 || j >= arr.length) return; [arr[i], arr[j]] = [arr[j], arr[i]]; }
 
+  function addCategory(label) {
+    label = (label || "").trim();
+    if (!label) return false;
+    const used = new Set(work.categories.map(c => c.id.toLowerCase()));
+    work.categories.push({ id: unique(slugify(label) || "categorie", used), label, projects: [] });
+    changed(); return true;
+  }
+  function deleteCategory(ci) {
+    const c = work.categories[ci];
+    if (c.projects.length) { alert("Cette catégorie contient encore des projets. Supprime-les ou déplace-les d'abord."); return; }
+    if (!confirm(`Supprimer la catégorie « ${c.label} » ?`)) return;
+    work.categories.splice(ci, 1); changed();
+  }
+  function addProject(ci, title) {
+    title = (title || "").trim();
+    if (!title) return false;
+    const cat = work.categories[ci];
+    const used = new Set(allProjects(work).map(p => p.slug.toLowerCase()));
+    const slug = unique(slugify(title) || "projet", used);
+    cat.projects.push({ slug, title, description: "", folder: `${cat.id}/${slug}`, cover: "", photos: [] });
+    changed(); return true;
+  }
+  function deleteProject(ci, pi) {
+    const p = work.categories[ci].projects[pi];
+    if (!confirm(`Retirer le projet « ${p.title} » ?\nSes photos seront supprimées définitivement à l'enregistrement.`)) return;
+    work.categories[ci].projects.splice(pi, 1); changed();
+  }
+  function moveProject(ci, pi, ti) {
+    const [p] = work.categories[ci].projects.splice(pi, 1);
+    work.categories[ti].projects.push(p); changed();
+  }
+
+  function render() {
+    const box = $("catList"); box.replaceChildren();
+    const cats = work.categories;
+    cats.forEach((cat, ci) => {
+      const card = h("div", { class: "cat" });
+      card.appendChild(h("div", { class: "cat-head" }, [
+        h("input", { type: "text", value: cat.label, "aria-label": "Nom de la catégorie",
+          oninput: e => { cat.label = e.target.value; updateSave(); } }),
+        btn("↑", "Monter la catégorie", () => { swap(cats, ci, -1); changed(); }, ci === 0),
+        btn("↓", "Descendre la catégorie", () => { swap(cats, ci, 1); changed(); }, ci === cats.length - 1),
+        btn("Supprimer", "Supprimer la catégorie", () => deleteCategory(ci), false, "danger")
+      ]));
+      cat.projects.forEach((p, pi) => {
+        const row = h("div", { class: "proj" });
+        row.appendChild(h("input", { type: "text", value: p.title, "aria-label": "Titre du projet",
+          oninput: e => { p.title = e.target.value; updateSave(); } }));
+        row.appendChild(h("input", { type: "text", value: p.description || "", placeholder: "Description (facultatif)",
+          "aria-label": "Description du projet", oninput: e => { p.description = e.target.value; updateSave(); } }));
+        row.appendChild(h("div", { class: "meta", text: `${p.folder} · ${p.photos.length} photo${p.photos.length > 1 ? "s" : ""}` }));
+        const others = cats.map((c, i) => ({ c, i })).filter(x => x.i !== ci);
+        const btns = h("div", { class: "btns" }, [
+          btn("↑", "Monter le projet", () => { swap(cat.projects, pi, -1); changed(); }, pi === 0),
+          btn("↓", "Descendre le projet", () => { swap(cat.projects, pi, 1); changed(); }, pi === cat.projects.length - 1)
+        ]);
+        if (others.length) {
+          const sel = h("select", { "aria-label": "Déplacer vers une autre catégorie",
+            onchange: e => { if (e.target.value !== "") moveProject(ci, pi, +e.target.value); } },
+            [h("option", { value: "", text: "Déplacer vers…" })].concat(others.map(x => h("option", { value: String(x.i), text: x.c.label }))));
+          btns.appendChild(sel);
+        }
+        btns.appendChild(btn("Supprimer", "Supprimer le projet", () => deleteProject(ci, pi), false, "danger"));
+        row.appendChild(btns);
+        card.appendChild(row);
+      });
+      const input = h("input", { type: "text", placeholder: "Nouveau projet dans cette catégorie", autocomplete: "off", "aria-label": "Titre du nouveau projet" });
+      card.appendChild(h("div", { class: "add-row" }, [input,
+        btn("Ajouter", "Ajouter le projet", () => { if (!addProject(ci, input.value)) input.focus(); })]));
+      box.appendChild(card);
+    });
+  }
+
+  /* ---------- enregistrement ---------- */
   async function save() {
-    const text = $("aboutText").value.trim();
-    const email = $("aboutEmail").value.trim();
+    const email = ($("aboutEmail").value || "").trim();
+    work.about.text = $("aboutText").value.trim();
+    work.about.email = email;
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       say($("saveMsg"), "L'adresse email n'a pas l'air valide.", "err"); return;
     }
-    const next = JSON.parse(JSON.stringify(state.data));
-    next.about = Object.assign({}, next.about, { text, email });
+    if (work.categories.some(c => !c.label.trim())) { say($("saveMsg"), "Une catégorie n'a pas de nom.", "err"); return; }
+    if (allProjects(work).some(p => !p.title.trim())) { say($("saveMsg"), "Un projet n'a pas de titre.", "err"); return; }
+    work.categories.forEach(c => { c.label = c.label.trim(); c.projects.forEach(p => { p.title = p.title.trim(); p.description = (p.description || "").trim(); }); });
+
+    const kept = folders(work);
+    const del = [...folders(saved.data)].filter(f => !kept.has(f));
+    if (del.length) {
+      const names = saved.data.categories.flatMap(c => c.projects).filter(p => del.includes(p.folder)).map(p => `• ${p.title}`).join("\n");
+      if (!confirm(`Ces projets et toutes leurs photos vont être supprimés définitivement :\n\n${names}\n\nContinuer ?`)) return;
+    }
+    const text = serialize(work);
     $("save").disabled = true; say($("saveMsg"), "Enregistrement…");
     try {
-      const r = await gh("PUT", "contents/site.json", {
-        message: "Admin : mise à jour de À propos / contact",
-        content: b64enc(serialize(next)),
-        sha: state.sha,
-        branch: conn.branch
-      });
-      state = { data: next, sha: r.content.sha };
-      dirty = false;
+      if (!del.length) {
+        const r = await gh("PUT", "contents/site.json", {
+          message: "Admin : mise à jour du site", content: b64enc(text), sha: saved.sha, branch: conn.branch
+        });
+        saved = { data: JSON.parse(text), sha: r.content.sha };
+      } else {
+        await commitWithDeletes(text, del, `Admin : mise à jour du site (suppression de ${del.length} projet${del.length > 1 ? "s" : ""})`);
+        saved = await fetchSite();
+      }
+      work = clone(saved.data); render();
       say($("saveMsg"), "Enregistré. Les changements seront en ligne dans environ une minute.", "ok");
     } catch (e) {
-      $("save").disabled = false; say($("saveMsg"), e.message, "err");
+      say($("saveMsg"), e.message, "err");
     }
+    updateSave();
   }
 
   /* ---------- démarrage ---------- */
   $("connect").addEventListener("click", connect);
-  $("logout").addEventListener("click", logout);
+  $("logout").addEventListener("click", () => { if (isDirty() && !confirm("Des modifications ne sont pas enregistrées. Se déconnecter quand même ?")) return; logout(); });
   $("save").addEventListener("click", save);
-  $("aboutText").addEventListener("input", markDirty);
-  $("aboutEmail").addEventListener("input", markDirty);
-  window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+  $("aboutText").addEventListener("input", () => { if (work) { work.about.text = $("aboutText").value; updateSave(); } });
+  $("aboutEmail").addEventListener("input", () => { if (work) { work.about.email = $("aboutEmail").value; updateSave(); } });
+  $("addCat").addEventListener("click", () => { if (addCategory($("newCat").value)) $("newCat").value = ""; else $("newCat").focus(); });
+  window.addEventListener("beforeunload", e => { if (isDirty()) { e.preventDefault(); e.returnValue = ""; } });
 
   try {
     const c = JSON.parse(localStorage.getItem(CONN_KEY) || "null");
@@ -211,6 +383,8 @@
     const t = localStorage.getItem(TOKEN_KEY);
     if (t) { $("token").value = t; $("remember").checked = true; if (c) connect(); }
   } catch (e) { /* stockage indisponible : on continue sans */ }
+
+  if (window.__ADMIN_TEST__) window.__ADMIN_TEST__ = { connect, save, addCategory, addProject, deleteProject, deleteCategory, moveProject, slugify, getWork: () => work, getSaved: () => saved, isDirty };
 })();
 </script>
 </body>
