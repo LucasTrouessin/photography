@@ -106,20 +106,6 @@
           "photos": ["01.jpg", "02.jpg", "03.jpg", "04.jpg", "05.jpg", "06.jpg", "07.jpg", "08.jpg", "09.jpg", "10.jpg", "11.jpg"]
         }
       ]
-    },
-    {
-      "id": "nouvelle-cat-hehe",
-      "label": "Nouvelle cat hehe :)",
-      "projects": [
-        {
-          "slug": "mijina",
-          "title": "Mijina",
-          "description": "",
-          "folder": "nouvelle-cat-hehe/mijina",
-          "cover": "",
-          "photos": ["20261010-115611-18s.jpg", "20261010-115611-nho.jpg"]
-        }
-      ]
     }
   ]
 }
