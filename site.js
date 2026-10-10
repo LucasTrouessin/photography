@@ -24,7 +24,7 @@
         const img = new Image();
         img.alt = p.title;
         img.onload = () => { box.className = "project-image"; box.replaceChildren(img); };
-        img.src = path(p, cover(p));
+        if (cover(p)) img.src = path(p, cover(p));
         grid.appendChild(el("a", { class: "project", href: `project.html?p=${encodeURIComponent(p.slug)}` }, [
           box,
           el("div", {}, [el("strong", { text: p.title })])
@@ -56,6 +56,7 @@
     if (p.description) head.appendChild(el("p", { text: p.description }));
 
     const list = p.photos;
+    if (!list.length) gal.appendChild(el("p", { class: "empty", text: "No photos yet." }));
     const loaded = [];           // urls réellement chargées
     let failed = 0;
     list.forEach((f, i) => {

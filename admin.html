@@ -8,20 +8,24 @@
 <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 <style>
-  .adm{max-width:640px;margin:0 auto;padding:40px 20px 80px}
-  .adm h1{font-size:clamp(28px,6vw,44px);margin-bottom:8px}
-  .adm .lead{color:var(--muted);line-height:1.6;margin:0 0 36px}
+  .adm{max-width:720px;margin:0 auto;padding:40px 20px 40px}
+  .adm h1{font-size:clamp(28px,6vw,44px);margin:34px 0 8px}
+  .adm .lead{color:var(--muted);line-height:1.6;margin:0 0 30px}
   .adm section{border-top:1px solid var(--line);padding:22px 0 30px}
   .adm h2{font-size:18px;font-weight:500;letter-spacing:-.02em;margin:0 0 18px}
-  .adm label{display:block;font:11px "DM Mono",monospace;text-transform:uppercase;color:var(--muted);margin:16px 0 6px}
+  .adm h3{font:11px "DM Mono",monospace;text-transform:uppercase;color:var(--muted);margin:34px 0 14px;font-weight:400}
+  .adm label.f{display:block;font:11px "DM Mono",monospace;text-transform:uppercase;color:var(--muted);margin:16px 0 6px}
   .adm input[type=text],.adm input[type=email],.adm input[type=password],.adm textarea{width:100%;font:inherit;font-size:16px;padding:12px;border:1px solid var(--line);background:#fff;color:var(--fg);border-radius:0}
   .adm textarea{min-height:110px;resize:vertical;line-height:1.45}
-  .adm .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .adm .check{display:flex;gap:10px;align-items:center;margin:18px 0 0;font:inherit;text-transform:none;color:var(--fg)}
+  .adm .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .adm .check{display:flex;gap:10px;align-items:center;margin:18px 0 0;color:var(--fg)}
   .adm button{font:11px "DM Mono",monospace;text-transform:uppercase;letter-spacing:.06em;padding:14px 22px;border:1px solid var(--fg);background:var(--fg);color:var(--bg);cursor:pointer;margin-top:22px}
   .adm button.ghost{background:none;color:var(--fg);margin-left:8px}
-  .adm button:disabled{opacity:.45;cursor:default}
-  .adm .msg{margin-top:18px;line-height:1.5;min-height:1.5em}
+  .adm button:disabled{opacity:.4;cursor:default}
+  .adm button.sm{padding:9px 12px;margin:0;font-size:10px}
+  .adm button.danger{background:none;color:#a3261c;border-color:#a3261c}
+  .adm button.plain{background:none;color:var(--fg);border-color:var(--line)}
+  .adm .msg{margin-top:12px;line-height:1.5;min-height:1.5em}
   .adm .msg.err{color:#a3261c}.adm .msg.ok{color:#2c6b3a}
   .adm details{margin-top:16px;color:var(--muted);line-height:1.6}
   .adm summary{cursor:pointer;color:var(--fg)}
@@ -29,40 +33,74 @@
   .adm .hidden{display:none}
   .adm .top{display:flex;justify-content:space-between;align-items:baseline}
   .adm .top a{font:11px "DM Mono",monospace;text-transform:uppercase;color:inherit}
+  .adm :focus-visible{outline:2px solid var(--fg);outline-offset:2px}
 
-  .adm .cat{border:1px solid var(--line);padding:16px;margin:0 0 22px;background:rgba(255,255,255,.45)}
-  .adm .cat-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .adm .cat-head input{flex:1;min-width:160px;font-size:18px}
-  .adm .proj{border-top:1px solid var(--line);padding:14px 0 6px;margin-top:14px}
-  .adm .proj input+input{margin-top:8px}
-  .adm .meta{font:10px "DM Mono",monospace;color:var(--muted);margin:8px 0 0;text-transform:uppercase}
-  .adm .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center}
-  .adm button.sm{padding:9px 12px;margin:0;font-size:10px}
-  .adm button.danger{background:none;color:#a3261c;border-color:#a3261c}
+  /* texte fixe, éditable au clic */
+  .ed-view{padding:8px 0;border-bottom:1px dashed transparent;cursor:text;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+  .ed-view:hover,.ed-view:focus{border-bottom-color:var(--muted)}
+  .ed-view::after{content:" ✎";color:var(--muted);opacity:0;font-size:12px}
+  .ed-view:hover::after,.ed-view:focus::after{opacity:1}
+  .ed-view.empty{color:var(--muted);font-style:italic}
+  .ed.big .ed-view{font-size:18px}
+
+  /* accordéons */
+  .acc{border:1px solid var(--line);margin:0 0 12px;background:rgba(255,255,255,.45)}
+  .acc.sub{border-width:1px 0 0;margin:0;background:none}
+  .head{display:flex;align-items:center;gap:6px;padding:4px 8px 4px 0}
+  .head.over,.tile.over{outline:2px dashed var(--fg);outline-offset:-2px}
+  .adm .tgl{flex:1;display:flex;align-items:center;gap:10px;text-align:left;background:none;border:0;color:var(--fg);margin:0;padding:14px 12px;font:inherit;font-size:16px;letter-spacing:-.01em;text-transform:none;min-width:0}
+  .tgl .chev{width:14px;color:var(--muted);flex:none}
+  .tgl .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tgl .n{font:10px "DM Mono",monospace;color:var(--muted);text-transform:uppercase;white-space:nowrap}
+  .acc.sub .tgl{font-size:15px;padding-left:28px}
+  .handle{cursor:grab;color:var(--muted);padding:6px 8px;user-select:none}
+  @media (pointer:coarse){.handle{display:none}}
+  .body{padding:4px 16px 18px}
+  .acc.sub .body{padding:2px 16px 18px 28px}
+  .body .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;align-items:center}
   .adm select{font:inherit;font-size:14px;padding:8px;border:1px solid var(--line);background:#fff;color:var(--fg);border-radius:0}
-  .adm .add-row{display:flex;gap:8px;margin-top:16px}
-  .adm .add-row input{flex:1;min-width:0}
-  .adm .add-row button{margin:0}
-  .adm .savebar{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:6px 0 14px;margin-top:24px}
-  .adm .savebar .msg{margin-top:10px}
-  .adm h3{font:11px "DM Mono",monospace;text-transform:uppercase;color:var(--muted);margin:34px 0 14px;font-weight:400}
+  .adm .meta{font:10px "DM Mono",monospace;color:var(--muted);text-transform:uppercase;margin:4px 0 0}
+  .add-row{display:flex;gap:8px;margin-top:16px}
+  .add-row input{flex:1;min-width:0}
+  .add-row button{margin:0}
+
+  /* photos */
+  .ph-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:18px 0 8px;flex-wrap:wrap}
+  .ph-bar .lbl{font:11px "DM Mono",monospace;text-transform:uppercase;color:var(--muted)}
+  .ph-note{font-size:12px;color:var(--muted);line-height:1.5;margin:6px 0 10px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px}
+  .grid.drop{outline:2px dashed var(--fg);outline-offset:4px}
+  .tile{border:1px solid var(--line);background:#fff;padding:4px}
+  .tile .im{position:relative;aspect-ratio:1;background:#e4e1da;overflow:hidden}
+  .tile img{width:100%;height:100%;object-fit:cover;display:block}
+  .tile .no{position:absolute;left:4px;top:4px;background:rgba(21,21,21,.85);color:#fff;font:9px "DM Mono",monospace;padding:2px 5px}
+  .tile .bd{position:absolute;left:4px;bottom:4px;background:var(--bg);font:9px "DM Mono",monospace;padding:2px 5px;text-transform:uppercase}
+  .tile .bd.new{background:#2c6b3a;color:#fff}
+  .tile .tb{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-top:4px}
+  .adm .tile .tb button{padding:7px 0;font-size:12px;letter-spacing:0;text-transform:none;border-color:var(--line);background:none;color:var(--fg)}
+  .adm .tile .tb button.on{background:var(--fg);color:var(--bg)}
+  .adm .tile .tb button:disabled{opacity:.25}
+  .empty-ph{color:var(--muted);font-size:13px;padding:14px 0}
+
+  .savebar{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:6px 20px 14px;margin:24px -20px 0;z-index:3}
+  .savebar .msg{margin-top:10px}
 </style>
 </head>
 <body>
 <main class="adm">
   <div class="top"><span class="brand">ADMINISTRATION</span><a href="index.html">← Voir le site</a></div>
-  <h1 style="margin-top:34px">Gérer le site</h1>
-  <p class="lead">Les modifications sont enregistrées directement sur le site. Elles apparaissent en ligne environ une minute après l'enregistrement.</p>
+  <h1>Gérer le site</h1>
+  <p class="lead">Les modifications sont enregistrées directement sur le site et apparaissent en ligne environ une minute après l'enregistrement.</p>
 
   <!-- CONNEXION -->
   <section id="login">
     <h2>Connexion</h2>
-    <div class="row">
-      <div><label for="owner">Compte GitHub</label><input id="owner" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
-      <div><label for="repo">Dépôt</label><input id="repo" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+    <div class="row2">
+      <div><label class="f" for="owner">Compte GitHub</label><input id="owner" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      <div><label class="f" for="repo">Dépôt</label><input id="repo" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
     </div>
-    <label for="branch">Branche</label><input id="branch" type="text" value="main" autocomplete="off" autocapitalize="off" spellcheck="false">
-    <label for="token">Jeton d'accès</label><input id="token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <label class="f" for="branch">Branche</label><input id="branch" type="text" value="main" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <label class="f" for="token">Jeton d'accès</label><input id="token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
     <label class="check"><input id="remember" type="checkbox"> Se souvenir du jeton sur cet appareil</label>
     <button id="connect">Se connecter</button>
     <div id="loginMsg" class="msg" role="status"></div>
@@ -81,21 +119,21 @@
   <!-- ÉDITION -->
   <section id="editor" class="hidden">
     <h2>À propos et contact</h2>
-    <label for="aboutText">Texte « About »</label>
-    <textarea id="aboutText"></textarea>
-    <label for="aboutEmail">Email de contact</label>
-    <input id="aboutEmail" type="email" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <label class="f">Texte « About »</label>
+    <div id="aboutText"></div>
+    <label class="f">Email de contact</label>
+    <div id="aboutEmail"></div>
 
     <h3>Catégories et projets</h3>
-    <p class="lead" style="margin-bottom:18px">L'ordre affiché ici est l'ordre du site. Les adresses des projets ne changent pas quand tu renommes un titre. Rien n'est appliqué tant que tu n'as pas cliqué sur « Enregistrer ».</p>
+    <p class="lead" style="margin-bottom:18px">Clique sur une catégorie puis sur un projet pour le modifier. Les textes se modifient en cliquant dessus. Rien n'est appliqué avant « Enregistrer ».</p>
     <div id="catList"></div>
     <div class="add-row">
-      <input id="newCat" type="text" placeholder="Nouvelle catégorie" autocomplete="off">
+      <input id="newCat" type="text" placeholder="Nouvelle catégorie" autocomplete="off" aria-label="Nom de la nouvelle catégorie">
       <button id="addCat" class="sm" type="button">Ajouter</button>
     </div>
 
     <div class="savebar">
-      <button id="save" disabled>Enregistrer</button><button id="logout" class="ghost">Se déconnecter</button>
+      <button id="save" disabled style="margin-top:12px">Enregistrer</button><button id="logout" class="ghost" style="margin-top:12px">Se déconnecter</button>
       <div id="saveMsg" class="msg" role="status"></div>
     </div>
   </section>
@@ -107,12 +145,22 @@
   const CONN_KEY = "admin-conn";           // compte / dépôt / branche (pas secret)
   const TOKEN_KEY = "admin-token";         // seulement si « se souvenir » est coché
   const CONFLICT = "Le site a été modifié ailleurs entre-temps. Recharge la page puis refais ta modification.";
+  const MAX_SIDE = 2000, QUALITY = 0.82;   // même réglage que le script de compression
+  const FINE = !!(window.matchMedia && window.matchMedia("(pointer: fine)").matches);
+
   let conn = null;                         // { owner, repo, branch, token }
   let saved = null;                        // { data, sha } : site.json tel qu'il est sur GitHub
   let work = null;                         // copie en cours d'édition
+  const pending = new Map();               // chemin -> { blob } : photos à envoyer au prochain enregistrement
+  const previews = new Map();              // chemin -> url locale (aperçu immédiat, même avant la mise en ligne)
+  const ui = { cats: new Set(), projs: new Set() };   // éléments dépliés
+  let compressImpl = compress;
+  let busy = false;
 
   /* ---------- utilitaires ---------- */
   const clone = o => JSON.parse(JSON.stringify(o));
+  const pad = n => String(n).padStart(2, "0");
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
   function b64enc(str) {                   // texte UTF-8 (accents) -> base64
     const bytes = new TextEncoder().encode(str);
     let bin = ""; bytes.forEach(b => bin += String.fromCharCode(b));
@@ -121,6 +169,12 @@
   function b64dec(b64) {                   // base64 -> texte UTF-8
     const bin = atob(b64.replace(/\s/g, ""));
     return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
+  }
+  async function blobToB64(blob) {         // fichier binaire -> base64
+    const buf = new Uint8Array(await blob.arrayBuffer());
+    let bin = "";
+    for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+    return btoa(bin);
   }
   function serialize(data) {               // JSON lisible, listes de photos sur une ligne
     return JSON.stringify(data, null, 2).replace(/"photos": \[([\s\S]*?)\]/g,
@@ -151,26 +205,37 @@
   }
   const allProjects = d => d.categories.flatMap(c => c.projects);
   const folders = d => new Set(allProjects(d).map(p => p.folder));
+  const photoPaths = d => new Set(allProjects(d).flatMap(p => p.photos.map(n => `${p.folder}/${n}`)));
   const isDirty = () => !!(saved && work) && serialize(work) !== serialize(saved.data);
+  const toggle = (set, k) => set.has(k) ? set.delete(k) : set.add(k);
+  const plural = (n, w) => `${n} ${w}${n > 1 ? "s" : ""}`;
 
   /* ---------- accès GitHub ---------- */
   async function gh(method, path, body) {
     const url = `https://api.github.com/repos/${encodeURIComponent(conn.owner)}/${encodeURIComponent(conn.repo)}/${path}`;
-    let res;
-    try {
-      res = await fetch(url, {
-        method, cache: "no-store",
-        headers: Object.assign({
-          Authorization: `Bearer ${conn.token}`,
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28"
-        }, body ? { "Content-Type": "application/json" } : {}),
-        body: body ? JSON.stringify(body) : undefined
-      });
-    } catch (e) {
-      throw new Error("Connexion impossible. Vérifie ta connexion internet.");
-    }
-    if (!res.ok) {
+    for (let attempt = 0; ; attempt++) {
+      let res;
+      try {
+        res = await fetch(url, {
+          method, cache: "no-store",
+          headers: Object.assign({
+            Authorization: `Bearer ${conn.token}`,
+            Accept: "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28"
+          }, body ? { "Content-Type": "application/json" } : {}),
+          body: body ? JSON.stringify(body) : undefined
+        });
+      } catch (e) {
+        throw new Error("Connexion impossible. Vérifie ta connexion internet.");
+      }
+      if (res.ok) return res.json();
+      // limite de débit GitHub : on patiente puis on réessaie
+      const hd = res.headers && res.headers.get ? n => res.headers.get(n) : () => null;
+      if ((res.status === 403 || res.status === 429) && attempt < 3 && (hd("retry-after") || hd("x-ratelimit-remaining") === "0")) {
+        const wait = Math.min(60, +hd("retry-after") || 30);
+        say($("saveMsg"), `GitHub demande une courte pause (${wait} s)…`);
+        await sleep(wait * 1000); continue;
+      }
       const map = {
         401: "Jeton invalide ou expiré.",
         403: "Accès refusé : le jeton n'a pas la permission « Contents : Read and write ».",
@@ -180,11 +245,10 @@
       };
       throw new Error(map[res.status] || `Erreur GitHub (${res.status}).`);
     }
-    return res.json();
   }
 
-  // Un seul commit : met à jour site.json ET supprime les dossiers de photos retirés.
-  async function commitWithDeletes(text, delFolders, message) {
+  // Un seul commit : site.json + photos ajoutées + photos/dossiers supprimés.
+  async function commitChanges(c, message, onProgress) {
     const br = encodeURI(conn.branch);
     const ref = await gh("GET", `git/ref/heads/${br}`);
     const headSha = ref.object.sha;
@@ -194,15 +258,25 @@
     if (tree.truncated) throw new Error("Le dépôt est trop volumineux pour cette opération.");
     const cur = tree.tree.find(t => t.path === "site.json");
     if (!cur || cur.sha !== saved.sha) throw new Error(CONFLICT);
-    const entries = [{ path: "site.json", mode: "100644", type: "blob", content: text }];
+
+    const entries = [{ path: "site.json", mode: "100644", type: "blob", content: c.text }];
+    const delPaths = new Set(c.delPaths);
+    let removed = 0;
     tree.tree.forEach(t => {
-      if (t.type === "blob" && delFolders.some(f => t.path.startsWith(f + "/")))
-        entries.push({ path: t.path, mode: "100644", type: "blob", sha: null });
+      if (t.type !== "blob") return;
+      if (delPaths.has(t.path) || c.delFolders.some(f => t.path.startsWith(f + "/"))) {
+        entries.push({ path: t.path, mode: "100644", type: "blob", sha: null }); removed++;
+      }
     });
+    for (let i = 0; i < c.uploads.length; i++) {      // envoi des photos, une par une
+      onProgress && onProgress(i + 1, c.uploads.length);
+      const b = await gh("POST", "git/blobs", { content: await blobToB64(c.uploads[i].blob), encoding: "base64" });
+      entries.push({ path: c.uploads[i].path, mode: "100644", type: "blob", sha: b.sha });
+    }
     const nt = await gh("POST", "git/trees", { base_tree: treeSha, tree: entries });
     const nc = await gh("POST", "git/commits", { message, tree: nt.sha, parents: [headSha] });
     await gh("PATCH", `git/refs/heads/${br}`, { sha: nc.sha });
-    return entries.length - 1;             // nombre de fichiers supprimés
+    return removed;
   }
 
   async function fetchSite() {
@@ -236,8 +310,6 @@
   function showEditor() {
     work = clone(saved.data);
     work.about = work.about || {};
-    $("aboutText").value = work.about.text || "";
-    $("aboutEmail").value = work.about.email || "";
     $("login").classList.add("hidden");
     $("editor").classList.remove("hidden");
     render(); updateSave(); say($("saveMsg"), "");
@@ -246,23 +318,81 @@
   function logout() {
     localStorage.removeItem(TOKEN_KEY);
     conn = null; saved = null; work = null;
+    pending.clear();
     $("token").value = "";
     $("editor").classList.add("hidden");
     $("login").classList.remove("hidden");
     say($("loginMsg"), "");
   }
 
-  /* ---------- édition (en mémoire, rien n'est envoyé avant « Enregistrer ») ---------- */
-  function updateSave() { $("save").disabled = !isDirty(); }
-  function changed() { render(); updateSave(); say($("saveMsg"), ""); }
+  /* ---------- texte fixe, modifiable au clic ---------- */
+  function editable(o) {      // { get, set, label, placeholder, multiline, type, onChange, cls }
+    const box = h("div", { class: "ed " + (o.cls || "") });
+    function view() {
+      const v = o.get();
+      const t = h("div", { class: "ed-view" + (v ? "" : " empty"), tabindex: "0", role: "button",
+        "aria-label": `Modifier : ${o.label}`, text: v || o.placeholder || "Cliquer pour modifier" });
+      t.addEventListener("click", edit);
+      t.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); edit(); } });
+      box.replaceChildren(t);
+    }
+    function edit() {
+      const i = h(o.multiline ? "textarea" : "input", { type: o.multiline ? false : (o.type || "text"), "aria-label": o.label,
+        autocomplete: "off", autocapitalize: "off", spellcheck: o.type === "email" ? "false" : "true" });
+      i.value = o.get();
+      box.replaceChildren(i); i.focus();
+      let done = false;
+      const commit = () => { if (done) return; done = true; o.set(i.value.trim()); view(); o.onChange && o.onChange(); };
+      i.addEventListener("blur", commit);
+      i.addEventListener("keydown", e => {
+        if (e.key === "Escape") { done = true; view(); }
+        else if (e.key === "Enter" && (!o.multiline || e.ctrlKey || e.metaKey)) { e.preventDefault(); commit(); }
+      });
+    }
+    view();
+    return box;
+  }
+
+  /* ---------- glisser-déposer (ordinateur) ; les flèches marchent partout ---------- */
+  let drag = null;
+  function sortableSource(el, arr, index, imageEl) {
+    if (!FINE) return;
+    el.setAttribute("draggable", "true");
+    el.addEventListener("dragstart", e => {
+      drag = { arr, from: index };
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = "move";
+        try { e.dataTransfer.setData("text/plain", "x"); } catch (_) {}
+        if (imageEl && e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(imageEl, 12, 12);
+      }
+    });
+    el.addEventListener("dragend", () => { drag = null; });
+  }
+  function sortableTarget(el, arr, index) {
+    if (!FINE) return;
+    el.addEventListener("dragover", e => { if (drag && drag.arr === arr) { e.preventDefault(); el.classList.add("over"); } });
+    el.addEventListener("dragleave", () => el.classList.remove("over"));
+    el.addEventListener("drop", e => {
+      el.classList.remove("over");
+      if (!drag || drag.arr !== arr) return;
+      e.preventDefault(); e.stopPropagation();
+      const from = drag.from; drag = null;
+      if (from !== index) { const [it] = arr.splice(from, 1); arr.splice(index, 0, it); changed(); }
+    });
+  }
   function swap(arr, i, d) { const j = i + d; if (j < 0 || j >= arr.length) return; [arr[i], arr[j]] = [arr[j], arr[i]]; }
+
+  /* ---------- édition (en mémoire ; rien n'est envoyé avant « Enregistrer ») ---------- */
+  function updateSave() { $("save").disabled = busy || !isDirty(); }
+  function changed() { render(); updateSave(); say($("saveMsg"), ""); }
 
   function addCategory(label) {
     label = (label || "").trim();
     if (!label) return false;
     const used = new Set(work.categories.map(c => c.id.toLowerCase()));
-    work.categories.push({ id: unique(slugify(label) || "categorie", used), label, projects: [] });
-    changed(); return true;
+    const id = unique(slugify(label) || "categorie", used);
+    work.categories.push({ id, label, projects: [] });
+    ui.cats.add(id); changed(); return true;
   }
   function deleteCategory(ci) {
     const c = work.categories[ci];
@@ -277,104 +407,256 @@
     const used = new Set(allProjects(work).map(p => p.slug.toLowerCase()));
     const slug = unique(slugify(title) || "projet", used);
     cat.projects.push({ slug, title, description: "", folder: `${cat.id}/${slug}`, cover: "", photos: [] });
-    changed(); return true;
+    ui.cats.add(cat.id); ui.projs.add(slug); changed(); return true;
+  }
+  function dropLocalFiles(prefix) {        // oublie les photos locales d'un projet retiré
+    [pending, previews].forEach(m => [...m.keys()].forEach(k => {
+      if (k.startsWith(prefix)) { if (m === previews) URL.revokeObjectURL(m.get(k)); m.delete(k); }
+    }));
   }
   function deleteProject(ci, pi) {
     const p = work.categories[ci].projects[pi];
     if (!confirm(`Retirer le projet « ${p.title} » ?\nSes photos seront supprimées définitivement à l'enregistrement.`)) return;
-    work.categories[ci].projects.splice(pi, 1); changed();
+    work.categories[ci].projects.splice(pi, 1);
+    if (!allProjects(work).some(x => x.folder === p.folder)) dropLocalFiles(p.folder + "/");
+    changed();
   }
   function moveProject(ci, pi, ti) {
     const [p] = work.categories[ci].projects.splice(pi, 1);
     work.categories[ti].projects.push(p); changed();
   }
 
+  /* ---------- photos ---------- */
+  function nextPhotoName(p) {              // nom unique, jamais réutilisé (évite les anciennes images en cache)
+    const d = new Date(), z = n => pad(n);
+    const stamp = `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}`;
+    const used = new Set(p.photos);
+    allProjects(saved.data).filter(q => q.folder === p.folder).forEach(q => q.photos.forEach(n => used.add(n)));
+    pending.forEach((v, path) => used.add(path.slice(path.lastIndexOf("/") + 1)));
+    let name;
+    do { name = `${stamp}-${Math.random().toString(36).slice(2, 5).padEnd(3, "0")}.jpg`; } while (used.has(name));
+    return name;
+  }
+  async function compress(file) {          // réduit à 2000 px, JPEG qualité 82, supprime EXIF/GPS
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((ok, ko) => {
+        const i = new Image(); i.onload = () => ok(i); i.onerror = () => ko(new Error("format")); i.src = url;
+      });
+      const s = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(1, Math.round(img.naturalWidth * s)), hh = Math.max(1, Math.round(img.naturalHeight * s));
+      const c = document.createElement("canvas"); c.width = w; c.height = hh;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, hh);
+      ctx.imageSmoothingQuality = "high"; ctx.drawImage(img, 0, 0, w, hh);
+      const blob = await new Promise(r => c.toBlob(r, "image/jpeg", QUALITY));
+      if (!blob) throw new Error("encodage");
+      return blob;
+    } finally { URL.revokeObjectURL(url); }
+  }
+  async function addPhotos(p, fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length || busy) return;
+    busy = true; updateSave();
+    const failed = [];
+    for (let i = 0; i < files.length; i++) {
+      say($("saveMsg"), `Préparation des photos… ${i + 1}/${files.length}`);
+      try {
+        const blob = await compressImpl(files[i]);
+        const name = nextPhotoName(p), path = `${p.folder}/${name}`;
+        pending.set(path, { blob });
+        previews.set(path, URL.createObjectURL(blob));
+        p.photos.push(name);
+      } catch (e) { failed.push(files[i].name || "fichier"); }
+    }
+    busy = false; changed();
+    const ok = files.length - failed.length;
+    if (failed.length) say($("saveMsg"), `${plural(ok, "photo")} ajoutée${ok > 1 ? "s" : ""}. Ignoré (format non pris en charge) : ${failed.join(", ")}`, "err");
+    else say($("saveMsg"), `${plural(ok, "photo")} prête${ok > 1 ? "s" : ""}. Clique sur « Enregistrer » pour les publier.`, "ok");
+  }
+  function removePhoto(p, i) {
+    const name = p.photos[i], path = `${p.folder}/${name}`;
+    if (!confirm(`Retirer cette photo (${name}) ?`)) return;
+    p.photos.splice(i, 1);
+    if (p.cover === name) p.cover = "";
+    if (pending.has(path)) { pending.delete(path); URL.revokeObjectURL(previews.get(path)); previews.delete(path); }
+    changed();
+  }
+  function setCover(p, i) { p.cover = p.photos[i]; changed(); }
+
+  function photoSection(p) {
+    const wrap = h("div", {});
+    const input = h("input", { type: "file", accept: "image/*", multiple: true, class: "hidden", "aria-label": "Choisir des photos" });
+    input.addEventListener("change", () => { addPhotos(p, input.files); input.value = ""; });
+    wrap.appendChild(h("div", { class: "ph-bar" }, [
+      h("span", { class: "lbl", text: `Photos · ${p.photos.length}` }),
+      btn("+ Ajouter des photos", "Ajouter des photos", () => input.click())
+    ]));
+    wrap.appendChild(input);
+    wrap.appendChild(h("p", { class: "ph-note", text: "Les photos sont réduites à 2000 px et leurs métadonnées (dont le GPS) sont supprimées avant l'envoi. Sur ordinateur, tu peux aussi les glisser ici." }));
+    const grid = h("div", { class: "grid" });
+    if (!p.photos.length) grid.appendChild(h("div", { class: "empty-ph", text: "Aucune photo pour l'instant." }));
+    const eff = p.cover || p.photos[0];
+    p.photos.forEach((name, i) => {
+      const path = `${p.folder}/${name}`, isNew = pending.has(path);
+      const img = h("img", { alt: name, loading: "lazy", decoding: "async", src: previews.get(path) || encodeURI(path) });
+      img.addEventListener("error", () => { img.removeAttribute("src"); });
+      const im = h("div", { class: "im" }, [img, h("span", { class: "no", text: pad(i + 1) })]);
+      if (isNew) im.appendChild(h("span", { class: "bd new", text: "Nouveau" }));
+      else if (name === eff) im.appendChild(h("span", { class: "bd", text: "Couverture" }));
+      const tile = h("div", { class: "tile" }, [im, h("div", { class: "tb" }, [
+        btn("←", "Photo précédente", () => { swap(p.photos, i, -1); changed(); }, i === 0),
+        btn("→", "Photo suivante", () => { swap(p.photos, i, 1); changed(); }, i === p.photos.length - 1),
+        h("button", { type: "button", class: "sm" + (name === eff ? " on" : ""), "aria-label": "Définir comme couverture", title: "Couverture", text: "★", onclick: () => setCover(p, i), disabled: name === eff }),
+        btn("✕", "Retirer la photo", () => removePhoto(p, i), false, "danger")
+      ])]);
+      sortableSource(tile, p.photos, i, im); sortableTarget(tile, p.photos, i);
+      grid.appendChild(tile);
+    });
+    // dépôt de fichiers depuis l'ordinateur
+    grid.addEventListener("dragover", e => {
+      if (!drag && e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files")) { e.preventDefault(); grid.classList.add("drop"); }
+    });
+    grid.addEventListener("dragleave", () => grid.classList.remove("drop"));
+    grid.addEventListener("drop", e => {
+      grid.classList.remove("drop");
+      if (!drag && e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) { e.preventDefault(); addPhotos(p, e.dataTransfer.files); }
+    });
+    wrap.appendChild(grid);
+    return wrap;
+  }
+
+  /* ---------- affichage ---------- */
   function render() {
     const box = $("catList"); box.replaceChildren();
     const cats = work.categories;
     cats.forEach((cat, ci) => {
-      const card = h("div", { class: "cat" });
-      card.appendChild(h("div", { class: "cat-head" }, [
-        h("input", { type: "text", value: cat.label, "aria-label": "Nom de la catégorie",
-          oninput: e => { cat.label = e.target.value; updateSave(); } }),
+      const open = ui.cats.has(cat.id);
+      const handle = FINE ? h("span", { class: "handle", title: "Glisser pour réordonner", "aria-hidden": "true", text: "⠿" }) : null;
+      const head = h("div", { class: "head" }, [
+        h("button", { type: "button", class: "tgl", "aria-expanded": String(open), onclick: () => { toggle(ui.cats, cat.id); render(); } }, [
+          h("span", { class: "chev", text: open ? "▾" : "▸" }),
+          h("span", { class: "t", text: cat.label || "(sans nom)" }),
+          h("span", { class: "n", text: plural(cat.projects.length, "projet") })
+        ]),
+        handle,
         btn("↑", "Monter la catégorie", () => { swap(cats, ci, -1); changed(); }, ci === 0),
-        btn("↓", "Descendre la catégorie", () => { swap(cats, ci, 1); changed(); }, ci === cats.length - 1),
-        btn("Supprimer", "Supprimer la catégorie", () => deleteCategory(ci), false, "danger")
-      ]));
-      cat.projects.forEach((p, pi) => {
-        const row = h("div", { class: "proj" });
-        row.appendChild(h("input", { type: "text", value: p.title, "aria-label": "Titre du projet",
-          oninput: e => { p.title = e.target.value; updateSave(); } }));
-        row.appendChild(h("input", { type: "text", value: p.description || "", placeholder: "Description (facultatif)",
-          "aria-label": "Description du projet", oninput: e => { p.description = e.target.value; updateSave(); } }));
-        row.appendChild(h("div", { class: "meta", text: `${p.folder} · ${p.photos.length} photo${p.photos.length > 1 ? "s" : ""}` }));
-        const others = cats.map((c, i) => ({ c, i })).filter(x => x.i !== ci);
-        const btns = h("div", { class: "btns" }, [
-          btn("↑", "Monter le projet", () => { swap(cat.projects, pi, -1); changed(); }, pi === 0),
-          btn("↓", "Descendre le projet", () => { swap(cat.projects, pi, 1); changed(); }, pi === cat.projects.length - 1)
-        ]);
-        if (others.length) {
-          const sel = h("select", { "aria-label": "Déplacer vers une autre catégorie",
-            onchange: e => { if (e.target.value !== "") moveProject(ci, pi, +e.target.value); } },
-            [h("option", { value: "", text: "Déplacer vers…" })].concat(others.map(x => h("option", { value: String(x.i), text: x.c.label }))));
-          btns.appendChild(sel);
-        }
-        btns.appendChild(btn("Supprimer", "Supprimer le projet", () => deleteProject(ci, pi), false, "danger"));
-        row.appendChild(btns);
-        card.appendChild(row);
-      });
-      const input = h("input", { type: "text", placeholder: "Nouveau projet dans cette catégorie", autocomplete: "off", "aria-label": "Titre du nouveau projet" });
-      card.appendChild(h("div", { class: "add-row" }, [input,
-        btn("Ajouter", "Ajouter le projet", () => { if (!addProject(ci, input.value)) input.focus(); })]));
+        btn("↓", "Descendre la catégorie", () => { swap(cats, ci, 1); changed(); }, ci === cats.length - 1)
+      ]);
+      if (handle) sortableSource(handle, cats, ci, head);
+      sortableTarget(head, cats, ci);
+      const card = h("div", { class: "acc" }, [head]);
+
+      if (open) {
+        const body = h("div", { class: "body" });
+        body.appendChild(h("label", { class: "f", text: "Nom de la catégorie" }));
+        body.appendChild(editable({ label: "nom de la catégorie", cls: "big", get: () => cat.label, set: v => { cat.label = v; }, onChange: changed, placeholder: "Nom de la catégorie" }));
+        body.appendChild(h("div", { class: "btns" }, [btn("Supprimer la catégorie", "Supprimer la catégorie", () => deleteCategory(ci), false, "danger")]));
+        card.appendChild(body);
+
+        cat.projects.forEach((p, pi) => {
+          const pOpen = ui.projs.has(p.slug);
+          const ph = FINE ? h("span", { class: "handle", title: "Glisser pour réordonner", "aria-hidden": "true", text: "⠿" }) : null;
+          const phead = h("div", { class: "head" }, [
+            h("button", { type: "button", class: "tgl", "aria-expanded": String(pOpen), onclick: () => { toggle(ui.projs, p.slug); render(); } }, [
+              h("span", { class: "chev", text: pOpen ? "▾" : "▸" }),
+              h("span", { class: "t", text: p.title || "(sans titre)" }),
+              h("span", { class: "n", text: plural(p.photos.length, "photo") })
+            ]),
+            ph,
+            btn("↑", "Monter le projet", () => { swap(cat.projects, pi, -1); changed(); }, pi === 0),
+            btn("↓", "Descendre le projet", () => { swap(cat.projects, pi, 1); changed(); }, pi === cat.projects.length - 1)
+          ]);
+          if (ph) sortableSource(ph, cat.projects, pi, phead);
+          sortableTarget(phead, cat.projects, pi);
+          const sub = h("div", { class: "acc sub" }, [phead]);
+
+          if (pOpen) {
+            const pb = h("div", { class: "body" });
+            pb.appendChild(h("label", { class: "f", text: "Titre" }));
+            pb.appendChild(editable({ label: "titre du projet", cls: "big", get: () => p.title, set: v => { p.title = v; }, onChange: changed, placeholder: "Titre du projet" }));
+            pb.appendChild(h("label", { class: "f", text: "Description (facultatif)" }));
+            pb.appendChild(editable({ label: "description du projet", multiline: true, get: () => p.description || "", set: v => { p.description = v; }, onChange: updateSave, placeholder: "Ajouter une description…" }));
+            pb.appendChild(h("div", { class: "meta", text: `Dossier : ${p.folder}` }));
+            pb.appendChild(photoSection(p));
+            const row = h("div", { class: "btns" });
+            const others = cats.map((c, i) => ({ c, i })).filter(x => x.i !== ci);
+            if (others.length) {
+              row.appendChild(h("select", { "aria-label": "Déplacer vers une autre catégorie",
+                onchange: e => { if (e.target.value !== "") moveProject(ci, pi, +e.target.value); } },
+                [h("option", { value: "", text: "Déplacer vers…" })].concat(others.map(x => h("option", { value: String(x.i), text: x.c.label })))));
+            }
+            row.appendChild(btn("Supprimer le projet", "Supprimer le projet", () => deleteProject(ci, pi), false, "danger"));
+            pb.appendChild(row);
+            sub.appendChild(pb);
+          }
+          card.appendChild(sub);
+        });
+
+        const input = h("input", { type: "text", placeholder: "Nouveau projet dans cette catégorie", autocomplete: "off", "aria-label": "Titre du nouveau projet" });
+        const add = () => { if (!addProject(ci, input.value)) input.focus(); };
+        input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); add(); } });
+        card.appendChild(h("div", { class: "body" }, [h("div", { class: "add-row" }, [input, btn("Ajouter", "Ajouter le projet", add)])]));
+      }
       box.appendChild(card);
     });
+    $("aboutText").replaceChildren(editable({ label: "texte About", multiline: true, get: () => work.about.text || "", set: v => { work.about.text = v; }, onChange: updateSave, placeholder: "Ajouter un texte…" }));
+    $("aboutEmail").replaceChildren(editable({ label: "email de contact", type: "email", get: () => work.about.email || "", set: v => { work.about.email = v; }, onChange: updateSave, placeholder: "Ajouter un email…" }));
   }
 
   /* ---------- enregistrement ---------- */
   async function save() {
-    const email = ($("aboutEmail").value || "").trim();
-    work.about.text = $("aboutText").value.trim();
-    work.about.email = email;
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      say($("saveMsg"), "L'adresse email n'a pas l'air valide.", "err"); return;
-    }
+    if (busy) return;
+    const email = (work.about.email || "").trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { say($("saveMsg"), "L'adresse email n'a pas l'air valide.", "err"); return; }
     if (work.categories.some(c => !c.label.trim())) { say($("saveMsg"), "Une catégorie n'a pas de nom.", "err"); return; }
     if (allProjects(work).some(p => !p.title.trim())) { say($("saveMsg"), "Un projet n'a pas de titre.", "err"); return; }
-    work.categories.forEach(c => { c.label = c.label.trim(); c.projects.forEach(p => { p.title = p.title.trim(); p.description = (p.description || "").trim(); }); });
 
-    const kept = folders(work);
-    const del = [...folders(saved.data)].filter(f => !kept.has(f));
-    if (del.length) {
-      const names = saved.data.categories.flatMap(c => c.projects).filter(p => del.includes(p.folder)).map(p => `• ${p.title}`).join("\n");
-      if (!confirm(`Ces projets et toutes leurs photos vont être supprimés définitivement :\n\n${names}\n\nContinuer ?`)) return;
+    const keptFolders = folders(work), keptPaths = photoPaths(work);
+    const delFolders = [...folders(saved.data)].filter(f => !keptFolders.has(f));
+    const delPaths = [...photoPaths(saved.data)].filter(p => !keptPaths.has(p) && !delFolders.some(f => p.startsWith(f + "/")));
+    const uploads = [...pending.entries()].filter(([path]) => keptPaths.has(path)).map(([path, v]) => ({ path, blob: v.blob }));
+
+    if (delFolders.length || delPaths.length) {
+      const names = saved.data.categories.flatMap(c => c.projects).filter(p => delFolders.includes(p.folder)).map(p => `• projet « ${p.title} » et toutes ses photos`);
+      if (delPaths.length) names.push(`• ${plural(delPaths.length, "photo")} retirée${delPaths.length > 1 ? "s" : ""} de projets conservés`);
+      if (!confirm(`Ces éléments vont être supprimés définitivement :\n\n${names.join("\n")}\n\nContinuer ?`)) return;
     }
+
     const text = serialize(work);
-    $("save").disabled = true; say($("saveMsg"), "Enregistrement…");
+    busy = true; updateSave(); say($("saveMsg"), "Enregistrement…");
     try {
-      if (!del.length) {
+      if (!delFolders.length && !delPaths.length && !uploads.length) {
         const r = await gh("PUT", "contents/site.json", {
           message: "Admin : mise à jour du site", content: b64enc(text), sha: saved.sha, branch: conn.branch
         });
         saved = { data: JSON.parse(text), sha: r.content.sha };
       } else {
-        await commitWithDeletes(text, del, `Admin : mise à jour du site (suppression de ${del.length} projet${del.length > 1 ? "s" : ""})`);
+        const parts = [];
+        if (uploads.length) parts.push(`ajout de ${plural(uploads.length, "photo")}`);
+        if (delFolders.length) parts.push(`suppression de ${plural(delFolders.length, "projet")}`);
+        if (delPaths.length) parts.push(`suppression de ${plural(delPaths.length, "photo")}`);
+        await commitChanges({ text, delFolders, delPaths, uploads },
+          `Admin : mise à jour du site (${parts.join(", ") || "contenu"})`,
+          (i, n) => say($("saveMsg"), `Envoi des photos… ${i}/${n}`));
         saved = await fetchSite();
       }
-      work = clone(saved.data); render();
+      pending.clear();                                   // les aperçus locaux restent affichés jusqu'au rechargement
+      work = clone(saved.data); work.about = work.about || {};
+      busy = false; render();
       say($("saveMsg"), "Enregistré. Les changements seront en ligne dans environ une minute.", "ok");
     } catch (e) {
-      say($("saveMsg"), e.message, "err");
+      busy = false; say($("saveMsg"), e.message, "err");
     }
-    updateSave();
+    busy = false; updateSave();
   }
 
   /* ---------- démarrage ---------- */
   $("connect").addEventListener("click", connect);
   $("logout").addEventListener("click", () => { if (isDirty() && !confirm("Des modifications ne sont pas enregistrées. Se déconnecter quand même ?")) return; logout(); });
   $("save").addEventListener("click", save);
-  $("aboutText").addEventListener("input", () => { if (work) { work.about.text = $("aboutText").value; updateSave(); } });
-  $("aboutEmail").addEventListener("input", () => { if (work) { work.about.email = $("aboutEmail").value; updateSave(); } });
   $("addCat").addEventListener("click", () => { if (addCategory($("newCat").value)) $("newCat").value = ""; else $("newCat").focus(); });
+  $("newCat").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("addCat").click(); } });
   window.addEventListener("beforeunload", e => { if (isDirty()) { e.preventDefault(); e.returnValue = ""; } });
 
   try {
@@ -384,7 +666,12 @@
     if (t) { $("token").value = t; $("remember").checked = true; if (c) connect(); }
   } catch (e) { /* stockage indisponible : on continue sans */ }
 
-  if (window.__ADMIN_TEST__) window.__ADMIN_TEST__ = { connect, save, addCategory, addProject, deleteProject, deleteCategory, moveProject, slugify, getWork: () => work, getSaved: () => saved, isDirty };
+  if (window.__ADMIN_TEST__) window.__ADMIN_TEST__ = {
+    connect, save, addCategory, addProject, deleteProject, deleteCategory, moveProject,
+    addPhotos, removePhoto, setCover, slugify, sortableSource, sortableTarget,
+    setCompress: f => { compressImpl = f; },
+    getWork: () => work, getSaved: () => saved, getPending: () => pending, isDirty, setDrag: d => { drag = d; }, getDrag: () => drag
+  };
 })();
 </script>
 </body>
