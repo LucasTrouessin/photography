@@ -1,0 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400&family=Manrope:wght@400;500;600&display=swap');
+:root{--bg:#f5f4f0;--fg:#151515;--muted:#77756f;--line:#d8d6d0}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--fg);font-family:Manrope,Arial,sans-serif;font-size:14px}.nav{height:72px;padding:0 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(245,244,240,.92);backdrop-filter:blur(12px);z-index:5}.nav a{color:inherit;text-decoration:none}.brand{font-size:12px;font-weight:600;letter-spacing:.08em}.nav nav{display:flex;gap:28px;font-family:"DM Mono",monospace;font-size:11px;text-transform:uppercase}.hero{min-height:calc(100vh - 72px);padding:28px;display:grid;grid-template-columns:1fr;align-content:center}.hero-image{height:min(72vh,760px);position:relative}.placeholder{background:linear-gradient(135deg,#dedbd3,#aaa79f);display:flex;align-items:center;justify-content:center;color:#666;font:10px "DM Mono",monospace;letter-spacing:.12em}.hero-caption{display:flex;justify-content:space-between;align-items:flex-end;padding-top:16px}.hero-caption span,.section-head span,.about span,.category-title span{font:10px "DM Mono",monospace;text-transform:uppercase;color:var(--muted)}h1{font-size:clamp(34px,5vw,72px);font-weight:400;line-height:.98;letter-spacing:-.045em;margin:0}.work{padding:130px 28px 80px}.section-head,.category-title{display:flex;align-items:baseline;justify-content:space-between;border-top:1px solid var(--line);padding-top:13px}.section-head h2,.about h2{font-size:14px;font-weight:500;margin:0}.category{margin-top:90px}.category-title h3{font-size:26px;font-weight:400;letter-spacing:-.03em;margin:0}.project-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:32px;margin-top:25px}.project{color:inherit;text-decoration:none}.project-image{height:62vh;min-height:400px}.project:nth-child(even) .project-image{margin-top:100px;height:52vh}.project strong,.project small{display:block}.project strong{font-size:14px;font-weight:500;margin-top:12px}.project small{font:10px "DM Mono",monospace;color:var(--muted);margin-top:5px;text-transform:uppercase}.about{padding:120px 28px 160px;display:grid;grid-template-columns:1fr 2fr;gap:30px;border-top:1px solid var(--line)}.about p{font-size:clamp(24px,3.2vw,46px);line-height:1.08;letter-spacing:-.04em;max-width:850px;margin:0}.contact{grid-column:2;color:inherit;text-decoration:none;margin-top:35px;font:11px "DM Mono",monospace}.contact:hover{text-decoration:underline}footer{border-top:1px solid var(--line);padding:18px 28px;display:flex;justify-content:space-between;font:10px "DM Mono",monospace;color:var(--muted);text-transform:uppercase}@media(max-width:700px){.nav{padding:0 16px}.hero,.work,.about{padding-left:16px;padding-right:16px}.hero{min-height:calc(100vh - 72px)}.hero-image{height:65vh}.hero-caption{display:block}.hero-caption span{display:block;margin-bottom:16px}.project-grid{grid-template-columns:1fr;gap:50px}.project:nth-child(even) .project-image{margin-top:0}.project-image{height:75vh;min-height:360px}.about{display:block}.about p{margin-top:35px}.contact{display:block;margin-top:35px}footer{padding:16px}.work{padding-top:90px}}
+
+/* ---- Ajouts : images, page projet, lightbox ---- */
+.hero-image{overflow:hidden}
+.hero-image img,.project-image img{width:100%;height:100%;object-fit:cover;display:block}
+.project-image{overflow:hidden}
+.project-head{padding:28px 28px 70px}
+.project-head .kicker{font:10px "DM Mono",monospace;color:var(--muted);text-transform:uppercase}
+.project-head h1{margin-top:20px}
+.project-head p{max-width:560px;color:var(--muted);line-height:1.6;margin:25px 0 0}
+.gallery{columns:2;column-gap:32px;padding:0 28px 90px}
+.gallery figure{margin:0 0 32px;break-inside:avoid}
+.gallery img{width:100%;height:auto;display:block;cursor:zoom-in;background:#e4e1da}
+.gallery .placeholder{height:60vh;cursor:default}
+.gallery .empty{column-span:all;color:var(--muted);font:11px "DM Mono",monospace}
+.pager{display:flex;justify-content:space-between;gap:20px;padding:28px;border-top:1px solid var(--line);font:11px "DM Mono",monospace;text-transform:uppercase}
+.pager a{color:inherit;text-decoration:none}.pager a:hover{text-decoration:underline}
+.lb{position:fixed;inset:0;background:rgba(245,244,240,.98);z-index:20;display:none;align-items:center;justify-content:center}
+.lb.open{display:flex}
+.lb img{max-width:92vw;max-height:86vh;object-fit:contain}
+.lb button{position:absolute;background:none;border:0;color:var(--fg);font:11px "DM Mono",monospace;text-transform:uppercase;cursor:pointer;padding:18px}
+.lb button:focus-visible,.pager a:focus-visible,.gallery img:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+.lb .x{top:6px;right:10px}.lb .prev{left:6px;top:50%}.lb .next{right:6px;top:50%}
+.lb .count{position:absolute;bottom:16px;left:28px;font:10px "DM Mono",monospace;color:var(--muted)}
+@media(max-width:700px){.project-head{padding:20px 16px 50px}.gallery{columns:1;padding:0 16px 60px}.pager{padding:20px 16px}.lb .count{left:16px}}
+
+img{-webkit-user-drag:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#categories .category:first-child{margin-top:0}
+
+/* ---- Hero : photo entière, pleine largeur, sans recadrage ---- */
+.hero{display:block;min-height:0;padding:0}
+.hero-image{height:auto;background:none}
+.hero-image img{width:100%;height:auto;max-height:90vh;object-fit:contain;display:block;margin:0 auto}
+.hero-image.missing{height:50vh;background:linear-gradient(135deg,#dedbd3,#aaa79f)}
+.hero-caption{padding:20px 28px 0}
+@media(max-width:700px){.hero{min-height:0}.hero-image{height:auto}.hero-image.missing{height:50vh}.hero-image img{max-height:none}.hero-caption{display:block;padding:16px 16px 0}}
+
+/* ---- Accueil : espace réduit + vignettes sans recadrage ---- */
+.work{padding-top:80px}
+.project-grid{align-items:start}
+.project-image{height:auto;min-height:0}
+.project:nth-child(even) .project-image{height:auto}
+.project-image img{height:auto;object-fit:contain}
+.project-image.placeholder,.project:nth-child(even) .project-image.placeholder{height:50vh;min-height:300px}
+@media(max-width:700px){
+  .work{padding-top:40px}
+  .project-grid{gap:44px}
+  .project-image,.project:nth-child(even) .project-image{height:auto;min-height:0;margin-top:0}
+  .project-image.placeholder,.project:nth-child(even) .project-image.placeholder{height:50vh;min-height:300px}
+}
+
+/* ---- Accueil : vignettes plus petites (3 col. desktop, 2 col. mobile) ---- */
+.project-grid{grid-template-columns:repeat(2,1fr);gap:60px 32px}
+.project:nth-child(even) .project-image{margin-top:0}
+.project-image img{width:auto;max-width:100%;max-height:55vh}
+.project strong{font-size:13px;margin-top:10px}
+.project-image.placeholder,.project:nth-child(even) .project-image.placeholder{height:40vh;min-height:240px}
+
+/* ---- About : même taille que Portraits / Street ---- */
+.about h2{font-size:26px;font-weight:400;letter-spacing:-.03em}
+.about p{font-size:18px;line-height:1.45;letter-spacing:-.01em;max-width:560px}
+
+/* ---- Lightbox : boutons toujours à portée ---- */
+@media(max-width:700px){
+  .project-grid{grid-template-columns:1fr;gap:44px}
+  .project-image img{width:100%;max-height:none}
+  .project strong{font-size:14px}
+  .project-image.placeholder,.project:nth-child(even) .project-image.placeholder{height:50vh;min-height:300px}
+  .lb{padding:52px 0 76px;box-sizing:border-box}
+  .lb img{max-width:96vw;max-height:calc(100vh - 128px);max-height:calc(100dvh - 128px)}
+  .lb .prev,.lb .next{top:auto;bottom:8px;padding:16px 22px}
+  .lb .prev{left:6px}.lb .next{right:6px}
+  .lb .count{left:50%;transform:translateX(-50%);bottom:26px}
+}
