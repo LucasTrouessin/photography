@@ -110,7 +110,16 @@
     {
       "id": "nouvelle-cat-hehe",
       "label": "Nouvelle cat hehe :)",
-      "projects": []
+      "projects": [
+        {
+          "slug": "mijina",
+          "title": "Mijina",
+          "description": "",
+          "folder": "nouvelle-cat-hehe/mijina",
+          "cover": "",
+          "photos": ["20261010-115611-18s.jpg", "20261010-115611-nho.jpg"]
+        }
+      ]
     }
   ]
 }
