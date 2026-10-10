@@ -114,6 +114,11 @@
           "photos": ["20261010-114611-1yd.jpg", "20261010-114611-7e6.jpg", "20261010-114611-snc.jpg", "20261010-114611-gof.jpg"]
         }
       ]
+    },
+    {
+      "id": "nouvelle-cat-hehe",
+      "label": "Nouvelle cat hehe :)",
+      "projects": []
     }
   ]
 }
