@@ -4,9 +4,9 @@
   },
   "hero": {
     "title": "People, places\n& moments.",
-    "image": "hero/20261010-132802-ncs.jpg",
+    "image": "fondo.jpeg",
     "history": [
-      "fondo.jpeg"
+      "hero/20261010-132802-ncs.jpg"
     ]
   },
   "about": {
