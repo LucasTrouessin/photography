@@ -10,9 +10,10 @@
     return e;
   };
   /* ---------- FILIGRANE ---------- */
-  const MARK_SVG = '<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-linecap="square">'
-    + '<path stroke-width="2.5" d="M8 26V8h18M74 8h18v18M92 74v18H74M26 92H8V74"/>'
-    + '<path stroke-width="3.2" d="M35 26v38h15M50 38h24M62 38v38"/></svg>';
+  // logo « LT » (dessiné sur Canva, redessiné en rectangles nets) — même tracé que icons/logo.svg
+  const MARK_SVG = '<svg viewBox="0 0 827 720.5" fill="currentColor">'
+    + '<path d="M0 0h202.6v42.5H0zM0 0h42.5v202.6H0zM517.9 678h202.6v42.5H517.9zM678 517.9h42.5v202.6H678z'
+    + 'M0 378.5h42.5v342H0zM0 678h190.6v42.5H0zM678 0h42.5v342H678zM571.5 0h255.6v42.5H571.5z"/></svg>';
   let WM = null;                                   // réglages actifs (null = pas de filigrane)
   function setWatermark(data) {
     const w = data.watermark;

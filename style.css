@@ -80,9 +80,9 @@ img{-webkit-user-drag:none;user-select:none;-webkit-user-select:none;-webkit-tou
 .gallery .wm-wrap{display:block}
 .hero-image{text-align:center}
 .hero-image .wm-wrap img{width:auto;max-width:100%}
-.wm{position:absolute;right:0;bottom:0;margin:0 3% 3% 0;width:7%;min-width:24px;max-width:76px;color:#fff;pointer-events:none;user-select:none}
-.wm.s{width:5%;min-width:20px;max-width:56px}
-.wm.l{width:10%;min-width:30px;max-width:104px}
+.wm{position:absolute;right:0;bottom:0;margin:0 3% 3% 0;width:6%;min-width:20px;max-width:64px;color:#fff;pointer-events:none;user-select:none}
+.wm.s{width:4.2%;min-width:16px;max-width:46px}
+.wm.l{width:8.5%;min-width:26px;max-width:88px}
 .wm.left{right:auto;left:0;margin:0 0 3% 3%}
 .wm.dark{color:#151515}
 .wm svg{display:block;width:100%;height:auto;overflow:visible}
@@ -102,3 +102,7 @@ img{-webkit-user-drag:none;user-select:none;-webkit-user-select:none;-webkit-tou
 .nav .where .cat{color:var(--muted)}
 .nav .where .cat::after{content:" / "}
 @media(max-width:700px){.nav .where{padding:0 12px}.nav .where .cat{display:none}}
+
+/* ---- Logo dans la barre du haut ---- */
+.nav .brand{display:flex;align-items:center;gap:10px}
+.brand-mark{height:18px;width:auto;flex:none;display:block}
