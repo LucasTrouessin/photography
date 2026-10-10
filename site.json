@@ -13,7 +13,7 @@
   "watermark": {
     "enabled": true,
     "color": "light",
-    "size": "m",
+    "size": "s",
     "position": "right",
     "opacity": 0.8
   },
