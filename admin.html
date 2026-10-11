@@ -6,6 +6,9 @@
 <meta name="robots" content="noindex,nofollow">
 <title>Administration</title>
 <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400&family=Manrope:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="style.css">
 <style>
   .adm{max-width:720px;margin:0 auto;padding:40px 20px 40px}
@@ -40,6 +43,7 @@
   .ed-view:hover,.ed-view:focus{border-bottom-color:var(--muted)}
   .ed-view::after{content:" ✎";color:var(--muted);opacity:0;font-size:12px}
   .ed-view:hover::after,.ed-view:focus::after{opacity:1}
+  @media (pointer:coarse){.ed-view::after{opacity:1}}
   .ed-view.empty{color:var(--muted);font-style:italic}
   .ed.big .ed-view{font-size:18px}
 
@@ -212,6 +216,7 @@
   const CONFLICT = "Le site a été modifié ailleurs entre-temps. Recharge la page puis refais ta modification.";
   const MAX_SIDE = 2000, QUALITY = 0.82;   // même réglage que le script de compression
   const THUMB_SIDE = 400, THUMB_Q = 0.7;   // miniatures utilisées seulement dans l'admin
+  const MED_SIDE = 1500, MED_Q = 0.78;     // version allégée (dossier medium/) utilisée par le site sur mobile et pour les vignettes
   const FINE = !!(window.matchMedia && window.matchMedia("(pointer: fine)").matches);
 
   let conn = null;                         // { owner, repo, branch, token }
@@ -261,7 +266,7 @@
       else if (k.slice(0, 2) === "on") e.addEventListener(k.slice(2), v);
       else e.setAttribute(k, v === true ? "" : v);
     }
-    (kids || []).forEach(c => e.appendChild(c));
+    (kids || []).forEach(c => { if (c) e.appendChild(c); });   // ignore les null (ex. poignée absente sur mobile)
     return e;
   }
   const btn = (text, aria, fn, disabled, cls) =>
@@ -294,6 +299,11 @@
     const i = path.lastIndexOf("/");
     return path.slice(0, i) + "/thumbs/" + path.slice(i + 1).replace(/\.[^.]+$/, "") + ".jpg";
   };
+  const mediumOfPath = path => {           // dossier/NOM.jpg -> dossier/medium/NOM.jpg
+    const i = path.lastIndexOf("/");
+    return path.slice(0, i) + "/medium/" + path.slice(i + 1).replace(/\.[^.]+$/, "") + ".jpg";
+  };
+  const derivs = path => [thumbOfPath(path), mediumOfPath(path)];
   const toggle = (set, k) => set.has(k) ? set.delete(k) : set.add(k);
   const plural = (n, w) => `${n} ${w}${n > 1 ? "s" : ""}`;
 
@@ -592,8 +602,10 @@
         const blob = await resizeImpl(files[i], MAX_SIDE, QUALITY);
         const name = nextPhotoName(p), path = `${p.folder}/${name}`;
         pending.set(path, { blob });
-        let tb = null;
-        try { tb = await resizeImpl(blob, THUMB_SIDE, THUMB_Q); } catch (e) { /* sans miniature : on affichera la photo */ }
+        let mb = null, tb = null;
+        try { mb = await resizeImpl(blob, MED_SIDE, MED_Q); } catch (e) { /* sans version allégée : le site utilisera la photo complète */ }
+        if (mb) pendingThumbs.set(mediumOfPath(path), { blob: mb });
+        try { tb = await resizeImpl(mb || blob, THUMB_SIDE, THUMB_Q); } catch (e) { /* sans miniature : on affichera la photo */ }
         if (tb) pendingThumbs.set(thumbOfPath(path), { blob: tb });
         previews.set(path, URL.createObjectURL(tb || blob));
         p.photos.push(name);
@@ -609,15 +621,18 @@
     if (!confirm(`Retirer cette photo (${name}) ?`)) return;
     p.photos.splice(i, 1);
     if (p.cover === name) p.cover = "";
-    pending.delete(path); pendingThumbs.delete(thumbOfPath(path));
+    pending.delete(path); derivs(path).forEach(d => pendingThumbs.delete(d));
     if (previews.has(path)) { URL.revokeObjectURL(previews.get(path)); previews.delete(path); }
     changed();
   }
-  function missingThumbs(projects) {      // photos déjà en ligne qui n'ont pas encore de miniature
+  function missingThumbs(projects) {      // photos en ligne sans miniature et/ou sans version allégée
     const out = [];
     projects.forEach(p => p.photos.forEach(name => {
-      const path = `${p.folder}/${name}`, tp = thumbOfPath(path);
-      if (treeKnown && repoFiles.has(path) && !repoFiles.has(tp) && !pendingThumbs.has(tp)) out.push({ path, tp });
+      const path = `${p.folder}/${name}`, tp = thumbOfPath(path), mp = mediumOfPath(path);
+      if (!treeKnown || !repoFiles.has(path)) return;
+      const needT = !repoFiles.has(tp) && !pendingThumbs.has(tp);
+      const needM = !repoFiles.has(mp) && !pendingThumbs.has(mp);
+      if (needT || needM) out.push({ path, tp, mp, needT, needM });
     }));
     return out;
   }
@@ -632,20 +647,25 @@
         try {
           const r = await fetch(encodeURI(j.path));
           if (!r.ok) throw new Error(r.status);
-          const tb = await resizeImpl(await r.blob(), THUMB_SIDE, THUMB_Q);
-          pendingThumbs.set(j.tp, { blob: tb });
-          if (previews.has(j.path)) URL.revokeObjectURL(previews.get(j.path));
-          previews.set(j.path, URL.createObjectURL(tb));
+          const src = await r.blob();
+          let mb = null;
+          if (j.needM) { mb = await resizeImpl(src, MED_SIDE, MED_Q); pendingThumbs.set(j.mp, { blob: mb }); }
+          if (j.needT) {
+            const tb = await resizeImpl(mb || src, THUMB_SIDE, THUMB_Q);
+            pendingThumbs.set(j.tp, { blob: tb });
+            if (previews.has(j.path)) URL.revokeObjectURL(previews.get(j.path));
+            previews.set(j.path, URL.createObjectURL(tb));
+          }
         } catch (e) { failed++; }
-        done++; say($("saveMsg"), `Création des miniatures… ${done}/${jobs.length}`);
+        done++; say($("saveMsg"), `Création des versions allégées… ${done}/${jobs.length}`);
       }
     }
-    await Promise.all([worker(), worker(), worker()]);
+    await Promise.all(Array.from({ length: FINE ? 3 : 1 }, worker));   // 1 seule à la fois sur téléphone (mémoire)
     busy = false; changed();
     const ok = jobs.length - failed;
     say($("saveMsg"), failed
-      ? `${plural(ok, "miniature")} créée${ok > 1 ? "s" : ""}, ${failed} en échec. Clique sur « Enregistrer » pour publier les miniatures créées.`
-      : `${plural(ok, "miniature")} créée${ok > 1 ? "s" : ""}. Clique sur « Enregistrer » pour les publier.`, failed ? "err" : "ok");
+      ? `${plural(ok, "photo")} allégée${ok > 1 ? "s" : ""}, ${failed} en échec. Clique sur « Enregistrer » pour publier celles qui sont prêtes.`
+      : `${plural(ok, "photo")} allégée${ok > 1 ? "s" : ""}. Clique sur « Enregistrer » pour les publier.`, failed ? "err" : "ok");
   }
   function setCover(p, i) { p.cover = p.photos[i]; changed(); }
 
@@ -661,8 +681,8 @@
     wrap.appendChild(h("p", { class: "ph-note", text: "Les photos sont réduites à 2000 px et leurs métadonnées (dont le GPS) sont supprimées avant l'envoi. Sur ordinateur, tu peux aussi les glisser ici." }));
     const miss = missingThumbs([p]);
     if (miss.length) wrap.appendChild(h("div", { class: "gen" }, [
-      h("span", { text: `${plural(miss.length, "photo")} sans miniature : l'affichage ici est lent. ` }),
-      btn("Créer les miniatures", "Créer les miniatures de ce projet", () => generateThumbs([p]))
+      h("span", { text: `${plural(miss.length, "photo")} sans version allégée (miniature admin + version mobile du site). ` }),
+      btn("Créer les versions allégées", "Créer les versions allégées de ce projet", () => generateThumbs([p]))
     ]));
     const grid = h("div", { class: "grid" });
     if (!p.photos.length) grid.appendChild(h("div", { class: "empty-ph", text: "Aucune photo pour l'instant." }));
@@ -706,8 +726,8 @@
     const box = $("catList"); box.replaceChildren();
     const missAll = missingThumbs(allProjects(work));
     if (missAll.length) box.appendChild(h("div", { class: "gen" }, [
-      h("span", { text: `${plural(missAll.length, "photo")} n'ont pas encore de miniature (affichage lent dans l'admin). Cette opération est à faire une seule fois.` }),
-      h("div", {}, [btn("Créer toutes les miniatures", "Créer les miniatures manquantes de tous les projets", () => generateThumbs(allProjects(work)))])
+      h("span", { text: `${plural(missAll.length, "photo")} sans version allégée : le site charge les photos en pleine taille (lent sur mobile) et l'admin est lent. À faire une seule fois, de préférence depuis un ordinateur.` }),
+      h("div", {}, [btn("Créer toutes les versions allégées", "Créer les versions allégées manquantes de tous les projets", () => generateThumbs(allProjects(work)))])
     ]));
     const cats = work.categories;
     cats.forEach((cat, ci) => {
@@ -953,11 +973,11 @@
     const keptFolders = folders(work), keptPaths = photoPaths(work);
     const delFolders = [...folders(saved.data)].filter(f => !keptFolders.has(f));
     const removedPhotos = [...photoPaths(saved.data)].filter(p => !keptPaths.has(p) && !delFolders.some(f => p.startsWith(f + "/")));
-    const delPaths = removedPhotos.concat(removedPhotos.filter(x => x.includes("/")).map(thumbOfPath));
+    const delPaths = removedPhotos.concat(removedPhotos.filter(x => x.includes("/")).flatMap(derivs));
     const oldHeroes = new Set(heroAll(saved.data));
     const heroGone = removedPhotos.filter(x => oldHeroes.has(x));
     const removedCount = removedPhotos.length - heroGone.length;
-    const keptThumbs = new Set([...keptPaths].map(thumbOfPath));
+    const keptThumbs = new Set([...keptPaths].flatMap(derivs));
     const photoUploads = [...pending.entries()].filter(([path]) => keptPaths.has(path)).map(([path, v]) => ({ path, blob: v.blob }));
     const uploads = photoUploads.concat([...pendingThumbs.entries()].filter(([path]) => keptThumbs.has(path)).map(([path, v]) => ({ path, blob: v.blob })));
 
@@ -979,7 +999,7 @@
       } else {
         const parts = [];
         if (photoUploads.length) parts.push(`ajout de ${plural(photoUploads.length, "photo")}`);
-        else if (uploads.length) parts.push("ajout de miniatures");
+        else if (uploads.length) parts.push("ajout de versions allégées");
         if (delFolders.length) parts.push(`suppression de ${plural(delFolders.length, "projet")}`);
         if (removedPhotos.length) parts.push(`suppression de ${plural(removedPhotos.length, "photo")}`);
         await commitChanges({ text, delFolders, delPaths, uploads },

@@ -70,6 +70,9 @@
   }
 
   const path = (p, file) => `${p.folder}/${file}`;
+  // Version allégée (créée par l'admin : dossier/medium/NOM.jpg). Si elle n'existe pas encore, on retombe sur la photo complète.
+  const mediumPath = (p, file) => `${p.folder}/medium/${file.replace(/\.[^.]+$/, "")}.jpg`;
+  const LIGHT = window.matchMedia("(max-width: 900px)").matches || !!(navigator.connection && navigator.connection.saveData);
   const cover = p => p.cover || p.photos[0];
 
   /* ---------- ACCUEIL ---------- */
@@ -84,7 +87,10 @@
         const img = new Image();
         img.alt = p.title;
         img.onload = () => { box.className = "project-image"; box.replaceChildren(withMark(img)); };
-        if (cover(p)) img.src = path(p, cover(p));
+        if (cover(p)) {
+          img.onerror = () => { if (!img.dataset.fb) { img.dataset.fb = "1"; img.src = path(p, cover(p)); } };   // pas de version allégée : photo complète
+          img.src = mediumPath(p, cover(p));
+        }
         grid.appendChild(el("a", { class: "project", href: `project.html?p=${encodeURIComponent(p.slug)}` }, [
           box,
           el("div", {}, [el("strong", { text: p.title })])
@@ -139,30 +145,61 @@
       const ok = items.slice(0, k).filter(it => it.state === "ok");
       if (done && !ok.length) {
         gal.replaceChildren(el("p", { class: "empty", text: `No photos yet — add them to ${p.folder}/` }));
+        gal.classList.remove("loading");
         return;
       }
       const cols = splitColumns(ok.map(it => it.ratio), n, done);
       gal.replaceChildren(...cols.map(c => el("div", { class: "gcol" }, c.map(i => ok[i].fig))));
+      gal.classList.remove("loading");
     }
     const onBreakpoint = () => { lastKey = ""; layout(); };
     if (narrow.addEventListener) narrow.addEventListener("change", onBreakpoint); else narrow.addListener(onBreakpoint);
 
+    // Chargement progressif : les photos sont demandées dans l'ordre, 2 à la fois, et seulement
+    // tant que la fin de la galerie est proche de l'écran (on ne télécharge pas tout d'un coup).
+    gal.classList.add("loading");
+    const sentinel = el("div", { class: "gal-end", "aria-hidden": "true" });
+    gal.insertAdjacentElement("afterend", sentinel);
+    let near = true, inflight = 0, next = 0;
+    // la 1re photo seule (elle conditionne l'affichage de toute la galerie), puis 2 à la fois
+    const limit = () => (items[0] && items[0].state === "wait") ? 1 : 2;
+    function pump() {
+      while (near && inflight < limit() && next < items.length) start(items[next++]);
+    }
+    function start(it) {
+      inflight++;
+      it.light = LIGHT;                                  // d'abord la version allégée (mobile), sinon la complète
+      it.img.src = it.light ? it.lightSrc : it.full;
+    }
+    function finish() { inflight--; pump(); }
+
     list.forEach((f, i) => {
       const img = new Image();
-      const it = { fig: el("figure"), img, ratio: 1, state: "wait" };
+      const it = { fig: el("figure"), img, ratio: 1, state: "wait", full: path(p, f), lightSrc: mediumPath(p, f), light: false };
       img.alt = `${p.title} — photo ${i + 1}`;
       img.tabIndex = 0;
       img.decoding = "async";
-      if (i > 5) img.fetchPriority = "low";
-      img.onload = () => { it.ratio = (img.naturalWidth / img.naturalHeight) || 1; it.state = "ok"; layout(); };
-      img.onerror = () => { it.state = "bad"; layout(); };
+      img.dataset.full = it.full;                        // la visionneuse affiche la version complète
+      if (i < 2) img.fetchPriority = "high";
+      img.onload = () => { it.ratio = (img.naturalWidth / img.naturalHeight) || 1; it.state = "ok"; layout(); finish(); };
+      img.onerror = () => {
+        if (it.light) { it.light = false; img.src = it.full; return; }   // pas de version allégée : on prend la complète
+        it.state = "bad"; layout(); finish();
+      };
       const open = () => openLightbox(ordered(), img);
       img.addEventListener("click", open);
       img.addEventListener("keydown", e => { if (e.key === "Enter") open(); });
       it.fig.appendChild(withMark(img));
       items.push(it);
-      img.src = path(p, f);
     });
+
+    if ("IntersectionObserver" in window) {
+      near = false;
+      new IntersectionObserver(entries => {
+        near = entries[entries.length - 1].isIntersecting;
+        if (near) pump();
+      }, { rootMargin: "1400px 0px" }).observe(sentinel);
+    } else pump();
 
     // projet précédent / suivant dans la même catégorie
     const sib = cat.projects, idx = sib.findIndex(x => x.slug === p.slug);
@@ -200,7 +237,13 @@
     });
   }
   function show() {
-    lbImg.src = imgs[cur].currentSrc || imgs[cur].src;
+    const shown = imgs[cur], want = cur, full = shown.dataset.full;
+    lbImg.src = shown.currentSrc || shown.src;           // tout de suite : ce qui est déjà chargé
+    if (full) {                                          // puis la version complète, dès qu'elle est prête
+      const pre = new Image();
+      pre.onload = () => { if (cur === want && pre.src !== lbImg.src) lbImg.src = pre.src; };
+      pre.src = full;
+    }
     lbImg.alt = imgs[cur].alt;
     lbCount.textContent = `${pad(cur + 1)} / ${pad(imgs.length)}`;
     lbImg.style.cursor = cur === imgs.length - 1 ? "default" : "pointer";
