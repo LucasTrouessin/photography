@@ -57,7 +57,9 @@ footer{border-top:1px solid var(--line);padding:18px 28px;display:flex;justify-c
 .gallery figure{margin:0 0 32px}
 .gallery img{width:100%;height:auto;display:block;cursor:zoom-in;background:#e4e1da}
 .gallery .empty{flex:1;color:var(--muted);font:11px "DM Mono",monospace}
-.gal-end{height:1px}
+.gal-status{margin-top:-60px;padding:0 28px 70px;font:11px "DM Mono",monospace;color:var(--muted);text-transform:uppercase}
+.gal-status:empty{display:none}
+.gal-status button{font:inherit;text-transform:inherit;color:var(--fg);background:none;border:0;border-bottom:1px solid currentColor;padding:0;margin-left:6px;cursor:pointer}
 .pager{display:flex;justify-content:space-between;gap:20px;padding:28px;border-top:1px solid var(--line);font:11px "DM Mono",monospace;text-transform:uppercase}
 .pager a{color:inherit;text-decoration:none}
 .pager a:hover{text-decoration:underline}
@@ -103,6 +105,7 @@ footer{border-top:1px solid var(--line);padding:18px 28px;display:flex;justify-c
   footer{padding:16px}
   .project-head{padding:20px 16px 50px}
   .gallery{padding:0 16px 60px}
+  .gal-status{margin-top:-36px;padding:0 16px 50px}
   .pager{padding:20px 16px}
   .project-image .wm-wrap{display:block}
   .lb{padding:52px 0 76px}

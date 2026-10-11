@@ -161,8 +161,9 @@
       while (k < items.length && items[k].state !== "wait") k++;        // photos prêtes, sans trou
       const done = k === items.length, n = narrow.matches ? 1 : 2;
       const ok = items.slice(0, k).filter(it => it.state === "ok");
+      updateStatus();
       if (done && !ok.length) {
-        gal.replaceChildren(el("p", { class: "empty", text: `No photos yet — add them to ${p.folder}/` }));
+        gal.replaceChildren();                           // tout a échoué : message + bouton dans la barre d'état
         gal.classList.remove("loading");
         return;
       }
@@ -187,35 +188,70 @@
     const onBreakpoint = () => { lastKey = ""; mode = 0; layout(); };
     if (narrow.addEventListener) narrow.addEventListener("change", onBreakpoint); else narrow.addListener(onBreakpoint);
 
-    // Chargement progressif : les photos sont demandées dans l'ordre, 2 à la fois, et seulement
-    // tant que la fin de la galerie est proche de l'écran (on ne télécharge pas tout d'un coup).
+    // Toutes les photos sont chargées dès l'arrivée sur la page, dans l'ordre, sans attendre le défilement
+    // (1re photo seule, puis 3 à la fois). Une barre d'état sous la galerie indique ce qui reste à charger
+    // ou ce qui a échoué : sans elle, la galerie a l'air finie alors qu'il manque des photos.
     gal.classList.add("loading");
-    const sentinel = el("div", { class: "gal-end", "aria-hidden": "true" });
-    gal.insertAdjacentElement("afterend", sentinel);
-    let near = true, inflight = 0, next = 0;
-    // la 1re photo seule (elle conditionne l'affichage de toute la galerie), puis 2 à la fois
-    const limit = () => (items[0] && items[0].state === "wait") ? 1 : 2;
+    const status = el("div", { class: "gal-status", role: "status" });
+    gal.insertAdjacentElement("afterend", status);
+    let inflight = 0;
+    const STALL_MS = 25000;                              // une requête bloquée plus longtemps est traitée comme une erreur
+    const limit = () => (items[0] && items[0].state === "wait") ? 1 : 3;
     function pump() {
-      while (near && inflight < limit() && next < items.length) start(items[next++]);
+      while (inflight < limit()) {
+        const it = items.find(x => x.state === "wait" && !x.started);
+        if (!it) break;
+        start(it);
+      }
+    }
+    function load(it, src) {
+      clearTimeout(it.timer);
+      it.timer = setTimeout(() => { if (it.img.onerror) it.img.onerror(); }, STALL_MS);
+      it.img.src = src;
     }
     function start(it) {
-      inflight++;
+      inflight++; it.started = true; it.tries = 0;
       it.light = LIGHT;                                  // d'abord la version allégée (mobile), sinon la complète
-      it.img.src = it.light ? it.lightSrc : it.full;
+      load(it, it.light ? it.lightSrc : it.full);
     }
     function finish() { inflight--; pump(); }
+    function retryFailed() {
+      items.forEach(it => { if (it.state === "bad") { it.state = "wait"; it.started = false; it.tries = 0; } });
+      lastKey = ""; mode = 0;                            // forcer la remise en page (les photos reprennent leur place)
+      gal.classList.add("loading");
+      updateStatus(); pump();
+    }
+    function updateStatus() {
+      const total = items.length;
+      const ok = items.filter(x => x.state === "ok").length, bad = items.filter(x => x.state === "bad").length;
+      status.replaceChildren();
+      if (ok + bad < total) {
+        status.textContent = `Loading photos… ${ok + bad} / ${total}`;
+      } else if (bad) {
+        const b = el("button", { type: "button", text: "Retry" });
+        b.onclick = retryFailed;
+        status.append(`${bad} ${bad > 1 ? "photos" : "photo"} could not be loaded. `, b);
+      }
+    }
+    window.addEventListener("online", () => { if (items.some(x => x.state === "bad")) retryFailed(); });
 
     list.forEach((f, i) => {
       const img = new Image();
-      const it = { fig: el("figure"), img, ratio: 1, state: "wait", full: path(p, f), lightSrc: mediumPath(p, f), light: false };
+      const it = { fig: el("figure"), img, ratio: 1, state: "wait", started: false, tries: 0, timer: null, full: path(p, f), lightSrc: mediumPath(p, f), light: false };
       img.alt = `${p.title} — photo ${i + 1}`;
       img.tabIndex = 0;
       img.decoding = "async";
       if (!LIGHT) img.dataset.full = it.full;            // la visionneuse passe à la version complète (sauf mobile / économie de données)
       if (i < 2) img.fetchPriority = "high";
-      img.onload = () => { it.ratio = (img.naturalWidth / img.naturalHeight) || 1; it.state = "ok"; layout(); finish(); };
+      img.onload = () => { clearTimeout(it.timer); it.ratio = (img.naturalWidth / img.naturalHeight) || 1; it.state = "ok"; layout(); finish(); };
       img.onerror = () => {
-        if (it.light) { it.light = false; img.src = it.full; return; }   // pas de version allégée : on prend la complète
+        if (it.light) { it.light = false; load(it, it.full); return; }   // pas de version allégée : on prend la complète
+        if (it.tries < 2) {                                              // erreur réseau passagère : 2 nouvelles tentatives
+          it.tries++; clearTimeout(it.timer);
+          it.timer = setTimeout(() => load(it, it.full + (it.full.includes("?") ? "&" : "?") + "r=" + it.tries), 1000 * it.tries);
+          return;
+        }
+        clearTimeout(it.timer);
         it.state = "bad"; layout(); finish();
       };
       const open = () => openLightbox(ordered(), img);
@@ -225,13 +261,8 @@
       items.push(it);
     });
 
-    if ("IntersectionObserver" in window) {
-      near = false;
-      new IntersectionObserver(entries => {
-        near = entries[entries.length - 1].isIntersecting;
-        if (near) pump();
-      }, { rootMargin: "1400px 0px" }).observe(sentinel);
-    } else pump();
+    updateStatus();
+    pump();
 
     // projet précédent / suivant dans la même catégorie
     const sib = cat.projects, idx = sib.findIndex(x => x.slug === p.slug);
