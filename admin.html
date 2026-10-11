@@ -119,7 +119,14 @@
   /* aperçu de la page d'un projet = éditeur des photos */
   .pv{margin-top:12px;padding:14px;border:1px solid var(--line);background:var(--bg)}
   .pv.drop{outline:2px dashed var(--fg);outline-offset:-2px}
-  .pv-cols{display:flex;gap:3%;align-items:flex-start;max-width:520px;margin:0 auto}
+  .pv-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+  .pv-head .lbl{font:11px "DM Mono",monospace;text-transform:uppercase;color:var(--muted)}
+  .seg{display:flex}
+  .adm .seg button{margin:0}
+  .adm .seg button + button{border-left-width:0}
+  .adm .seg button[aria-pressed=true]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+  .pv-cols{display:flex;gap:3%;align-items:flex-start;max-width:360px;margin:0 auto}      /* ordinateur : 2 colonnes, petit pour tout voir */
+  .pv.mob .pv-cols{max-width:230px}                                                     /* mobile : 1 colonne, largeur d'un téléphone */
   .pv-col{flex:1;min-width:0}
   .pv-it{position:relative;margin:0 0 5%;background:#e4e1da;user-select:none;-webkit-user-select:none}   /* 5 % = même espace que GAP dans splitColumns */
   .pv.fine .pv-it{cursor:grab}
@@ -139,12 +146,20 @@
   .adm .pv-bar button.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
   .adm .pv-bar button.danger{color:#a3261c}
   .adm .pv-bar button:disabled{opacity:.3}
-  @media (pointer:coarse){.adm .pv-bar button{padding:11px 0;font-size:15px}}
   .pv-it.bad{cursor:pointer}
   .pv-it.bad::after{content:"↻ Réessayer";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:10px "DM Mono",monospace;color:var(--muted);text-transform:uppercase;text-align:center}
   .pv-it.bad img{visibility:hidden}
   .pv-empty{color:var(--muted);font-size:13px;line-height:1.5;padding:26px 10px;text-align:center}
-  @media (max-width:700px){.pv{padding:8px}.pv-cols{max-width:none}}
+  /* barre de la photo sélectionnée (toucher) : reste visible en haut pendant qu'on fait défiler l'aperçu */
+  .pv-sel{position:sticky;top:0;z-index:4;margin:0 0 12px;padding:8px;background:var(--bg);border:1px solid var(--fg)}
+  .pv-sel-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 8px;min-height:32px}
+  .pv-sel-t{font:11px "DM Mono",monospace;text-transform:uppercase;line-height:1.4}
+  .pv-sel-ctl{display:flex;gap:6px;align-items:stretch}
+  .pv-sel-ctl select{flex:1;min-width:0;font-size:16px}
+  .adm .pv-sel-ctl button{flex:none;width:44px;margin:0;padding:11px 0;font-size:15px;letter-spacing:0;text-transform:none}
+  .adm .pv-sel-top button{margin:0}
+  .adm .pv-sel button.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+  @media (max-width:700px){.pv{padding:8px}.pv-cols,.pv.mob .pv-cols{max-width:none}}
 
   .savebar{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:6px 20px 14px;margin:24px -20px 0;z-index:3}
   .savebar .msg{margin-top:10px}
@@ -247,7 +262,9 @@
   let repoFiles = new Set();               // fichiers déjà présents dans le dépôt
   let treeKnown = false;                   // true si la liste des fichiers du dépôt a pu être lue
   let renderGen = 0;                       // sert à abandonner les chargements d'une ancienne vue
-  const ui = { cats: new Set(), projs: new Set(), sel: null };       // éléments dépliés ; sel = photo sélectionnée (chemin), pour les flèches au toucher
+  const ui = { cats: new Set(), projs: new Set(), sel: null, view: null };   // éléments dépliés ; sel = photo sélectionnée au toucher (chemin) ; view = aperçu "desk" (2 colonnes) ou "mob" (1 colonne)
+  const VIEW_KEY = "admin-view";
+  try { const v = localStorage.getItem(VIEW_KEY); if (v === "desk" || v === "mob") ui.view = v; } catch (e) { /* stockage indisponible */ }
   let resizeImpl = resize;
   let busy = false;
 
@@ -719,8 +736,8 @@
     ]));
     wrap.appendChild(input);
     const how = FINE
-      ? "Glisse une photo vers l'endroit où tu veux la placer (le trait noir montre où elle ira) : même mise en page que sur le site, 1 à gauche, 2 à droite, etc. Dépose des photos depuis ton ordinateur pour en ajouter. Survole une photo pour la mettre en couverture (★) ou la retirer (✕). "
-      : "Touche une photo pour la sélectionner, puis utilise ← → pour la reculer ou l'avancer, ★ pour la mettre en couverture, ✕ pour la retirer. Sur le site mobile, les photos s'affichent l'une sous l'autre, dans cet ordre. ";
+      ? "Glisse une photo vers l'endroit où tu veux la placer (le trait noir montre où elle ira). Dépose des photos depuis ton ordinateur pour en ajouter. Survole une photo pour la mettre en couverture (★) ou la retirer (✕). L'aperçu « Mobile » montre une seule colonne, comme sur téléphone : l'ordre est le même dans les deux vues. "
+      : "Touche une photo pour la sélectionner, puis utilise la barre en haut de l'aperçu : ← → pour la déplacer d'une place, la liste « Position » pour l'envoyer directement ailleurs, ★ pour la couverture, ✕ pour la retirer. L'aperçu « Ordinateur » montre 2 colonnes : l'ordre est le même dans les deux vues. ";
     wrap.appendChild(h("p", { class: "ph-note", text: how + "Les photos sont réduites à 2000 px et leurs métadonnées (dont le GPS) sont supprimées avant l'envoi." }));
     const miss = missingThumbs([p]);
     if (miss.length) wrap.appendChild(h("div", { class: "gen" }, [
@@ -731,28 +748,79 @@
     return wrap;
   }
 
-  // L'aperçu (2 colonnes, mêmes proportions que le site) : on y glisse les photos pour les ranger.
+  const boards = new Set();                                    // aperçus affichés : changer de vue ou de sélection les met tous à jour
+  const curView = () => ui.view || (FINE ? "desk" : "mob");    // desk = 2 colonnes (site sur ordinateur), mob = 1 colonne (site sur téléphone)
+  function setView(v) {
+    ui.view = v;
+    try { localStorage.setItem(VIEW_KEY, v); } catch (e) { /* stockage indisponible */ }
+    boards.forEach(bd => bd.refresh());
+  }
+  function selectPhoto(path) { ui.sel = path; boards.forEach(bd => bd.sync()); }   // toucher : (dés)sélectionne une photo
+
+  // L'aperçu de la page = l'éditeur. Deux vues (ordinateur : 2 colonnes, mobile : 1 colonne) qui partagent le même ordre,
+  // modifiables l'une comme l'autre : glisser-déposer avec une souris, barre de boutons + liste « Position » au toucher.
   // Un déplacement ne redessine que l'aperçu (les images ne sont pas rechargées).
   function photoBoard(p) {
     const box = h("div", { class: "pv" + (FINE ? " fine" : "") });
+    const segBtn = {};
+    const head = h("div", { class: "pv-head" }, [
+      h("span", { class: "lbl", text: "Aperçu" }),
+      h("div", { class: "seg", role: "group", "aria-label": "Type d'aperçu" }, [
+        segBtn.desk = btn("Ordinateur", "Aperçu ordinateur : 2 colonnes", () => setView("desk"), false, "plain"),
+        segBtn.mob = btn("Mobile", "Aperçu mobile : 1 colonne", () => setView("mob"), false, "plain")
+      ])
+    ]);
     const note = h("p", { class: "ph-note", style: "margin:0 0 10px" });
     const area = h("div", { class: "pv-cols" });
-    box.appendChild(note); box.appendChild(area);
     const pathOf = n => `${p.folder}/${n}`;
     const items = new Map();                                   // nom de photo -> { fig, img, ratio, state, … }
     const clearMarks = () => items.forEach(it => it.fig.classList.remove("mk-before", "mk-after", "dragging"));
+    const selName = () => {                                    // photo sélectionnée dans CE projet (ou null)
+      const pre = p.folder + "/";
+      const n = ui.sel && ui.sel.startsWith(pre) ? ui.sel.slice(pre.length) : null;
+      return n && p.photos.includes(n) ? n : null;
+    };
 
-    function select(name) {                                    // toucher : sélectionne / désélectionne
-      ui.sel = ui.sel === pathOf(name) ? null : pathOf(name);
-      items.forEach(it => it.fig.classList.toggle("sel", it.path === ui.sel));
-    }
     function reordered() { draw(); updateSave(); say($("saveMsg"), ""); }
-    function move(name, d) {                                   // flèches : une place plus tôt / plus tard
+    function moveTo(name, to, block) {                         // place la photo à la position `to` (0 = première)
       const i = p.photos.indexOf(name);
-      if (i < 0 || i + d < 0 || i + d >= p.photos.length) return;
-      swap(p.photos, i, d);
+      if (i < 0 || to < 0 || to >= p.photos.length || to === i) return;
+      p.photos.splice(i, 1); p.photos.splice(to, 0, name);
       reordered();
-      items.get(name).fig.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      items.get(name).fig.scrollIntoView({ block: block || "nearest", behavior: "smooth" });
+    }
+    const move = (name, d) => moveTo(name, p.photos.indexOf(name) + d, "nearest");
+    const makeCover = name => setCover(p, p.photos.indexOf(name));
+    const dropPhoto = name => removePhoto(p, p.photos.indexOf(name));
+    const tip = (b, t) => { b.title = t; return b; };
+
+    /* --- toucher : barre de la photo sélectionnée (reste en haut de l'écran) --- */
+    let bar = null, syncBar = () => {};
+    if (!FINE) {
+      const sel = () => selName();
+      const bTitle = h("span", { class: "pv-sel-t" });
+      const bClose = btn("Fermer", "Désélectionner la photo", () => selectPhoto(null), false, "plain");
+      const bP = tip(btn("←", "Reculer d'une place", () => sel() && move(sel(), -1), false, "plain"), "Reculer d'une place");
+      const bN = tip(btn("→", "Avancer d'une place", () => sel() && move(sel(), 1), false, "plain"), "Avancer d'une place");
+      const bC = tip(btn("★", "Définir comme couverture", () => sel() && makeCover(sel()), false, "plain"), "Couverture");
+      const bD = tip(btn("✕", "Retirer la photo", () => sel() && dropPhoto(sel()), false, "danger"), "Retirer la photo");
+      const pos = h("select", { "aria-label": "Déplacer à la position",
+        onchange: e => { const n = sel(); if (n) moveTo(n, +e.target.value, "center"); } },
+        p.photos.map((_, i) => h("option", { value: String(i), text: `Position ${pad(i + 1)}` })));
+      bar = h("div", { class: "pv-sel" }, [
+        h("div", { class: "pv-sel-top" }, [bTitle, bClose]),
+        h("div", { class: "pv-sel-ctl" }, [bP, bN, pos, bC, bD])
+      ]);
+      syncBar = () => {                                        // hauteur constante : pas de saut de page quand on sélectionne
+        const n = sel(), i = n ? p.photos.indexOf(n) : -1, on = i >= 0;
+        const isCover = on && n === (p.cover || p.photos[0]);
+        bTitle.textContent = on ? `Photo ${pad(i + 1)} sur ${pad(p.photos.length)}${isCover ? " · couverture" : ""}` : "Touche une photo pour la sélectionner";
+        [bClose, bP, bN, bC, bD, pos].forEach(x => { x.disabled = !on; });
+        if (!on) return;
+        bP.disabled = i === 0; bN.disabled = i === p.photos.length - 1;
+        bC.disabled = isCover; bC.classList.toggle("on", isCover);
+        pos.value = String(i);
+      };
     }
 
     function makeItem(name) {
@@ -760,13 +828,16 @@
       const img = h("img", { alt: name, decoding: "async", draggable: "false" });
       const no = h("span", { class: "pv-no" });
       const bd = h("span", { class: "pv-bd" });
-      const bPrev = btn("←", "Reculer d'une place", () => move(name, -1));
-      const bNext = btn("→", "Avancer d'une place", () => move(name, 1));
-      const bCover = btn("★", "Définir comme couverture", () => setCover(p, p.photos.indexOf(name)));
-      const bDel = btn("✕", "Retirer la photo", () => removePhoto(p, p.photos.indexOf(name)), false, "danger");
-      [[bPrev, "Reculer d'une place"], [bNext, "Avancer d'une place"], [bCover, "Couverture"], [bDel, "Retirer la photo"]].forEach(([b, t]) => b.title = t);
-      const fig = h("figure", { class: "pv-it", tabindex: "0" }, [img, no, bd, h("div", { class: "pv-bar" }, [bPrev, bNext, bCover, bDel])]);
-      const it = { name, path, fig, img, no, bd, bPrev, bNext, bCover, ratio: known || 1.5, state: known ? "ok" : "wait" };
+      const kids = [img, no, bd];
+      const it = { name, path, img, no, bd, ratio: known || 1.5, state: known ? "ok" : "wait" };
+      if (FINE) {                                              // souris : boutons au survol de la photo
+        it.bPrev = tip(btn("←", "Reculer d'une place", () => move(name, -1)), "Reculer d'une place");
+        it.bNext = tip(btn("→", "Avancer d'une place", () => move(name, 1)), "Avancer d'une place");
+        it.bCover = tip(btn("★", "Définir comme couverture", () => makeCover(name)), "Couverture");
+        const bDel = tip(btn("✕", "Retirer la photo", () => dropPhoto(name), false, "danger"), "Retirer la photo");
+        kids.push(h("div", { class: "pv-bar" }, [it.bPrev, it.bNext, it.bCover, bDel]));
+      }
+      const fig = it.fig = h("figure", { class: "pv-it", tabindex: "0" }, kids);
       fig.style.aspectRatio = String(it.ratio);
 
       const ok = () => {
@@ -782,11 +853,11 @@
         loadImage(img, fig, repoFiles.has(tp) ? [encodeURI(tp), full] : [full], { ok, bad });
       }
 
-      if (!FINE) fig.addEventListener("click", e => {          // toucher : afficher les boutons de cette photo
+      if (!FINE) fig.addEventListener("click", e => {          // toucher : sélectionner cette photo
         if (e.target.closest("button") || fig.classList.contains("bad")) return;
-        select(name);
+        selectPhoto(ui.sel === path ? null : path);
       });
-      if (FINE) {                                              // ordinateur : glisser-déposer sur l'aperçu
+      if (FINE) {                                              // souris : glisser-déposer sur l'aperçu (2 colonnes ou 1 colonne)
         fig.setAttribute("draggable", "true");
         fig.addEventListener("dragstart", e => {
           drag = { arr: p.photos, from: p.photos.indexOf(name) };
@@ -817,6 +888,11 @@
       return it;
     }
 
+    function sync() {                                          // sélection (toucher) : surbrillance + barre
+      const cur = selName();
+      items.forEach(it => it.fig.classList.toggle("sel", !FINE && it.name === cur));
+      syncBar();
+    }
     function draw() {
       const order = p.photos.map(n => items.get(n));
       const eff = p.cover || p.photos[0];
@@ -824,9 +900,10 @@
         it.no.textContent = pad(i + 1);
         const isNew = pending.has(it.path), isCover = it.name === eff;
         it.bd.replaceChildren(...[isNew && h("span", { class: "new", text: "Nouveau" }), isCover && h("span", { text: "Couverture" })].filter(Boolean));
-        it.bPrev.disabled = i === 0; it.bNext.disabled = i === order.length - 1;
-        it.bCover.disabled = isCover; it.bCover.classList.toggle("on", isCover);
-        it.fig.classList.toggle("sel", it.path === ui.sel);
+        if (it.bPrev) {
+          it.bPrev.disabled = i === 0; it.bNext.disabled = i === order.length - 1;
+          it.bCover.disabled = isCover; it.bCover.classList.toggle("on", isCover);
+        }
       });
       // comme site.js : on place les photos prêtes, dans l'ordre et sans trou ; les autres arrivent au fil du chargement
       let k = 0;
@@ -835,8 +912,16 @@
       note.hidden = done;
       if (!done) note.textContent = `Chargement de l'aperçu… ${k}/${order.length}`;
       const shown = order.slice(0, k);
-      const cols = splitColumns(shown.map(it => it.ratio), 2, done);
+      const cols = splitColumns(shown.map(it => it.ratio), curView() === "mob" ? 1 : 2, done);
       area.replaceChildren(...cols.map(c => h("div", { class: "pv-col" }, c.map(i => shown[i].fig))));
+      sync();
+    }
+    function refresh() {                                       // changement de vue ordinateur / mobile
+      const v = curView();
+      box.classList.toggle("mob", v === "mob");
+      segBtn.desk.setAttribute("aria-pressed", String(v === "desk"));
+      segBtn.mob.setAttribute("aria-pressed", String(v === "mob"));
+      draw();
     }
 
     // dépôt de fichiers depuis l'ordinateur, n'importe où sur l'aperçu
@@ -849,20 +934,23 @@
     });
 
     if (!p.photos.length) {
-      note.hidden = true;
-      area.appendChild(h("div", { class: "pv-empty", text: FINE
+      box.appendChild(h("div", { class: "pv-empty", text: FINE
         ? "Aucune photo pour l'instant. Dépose des photos ici ou utilise « + Ajouter des photos »."
         : "Aucune photo pour l'instant. Utilise « + Ajouter des photos »." }));
       return box;
     }
+    box.appendChild(head);
+    if (bar) box.appendChild(bar);
+    box.appendChild(note); box.appendChild(area);
     p.photos.forEach(name => items.set(name, makeItem(name)));
-    draw();
+    boards.add({ sync, refresh });
+    refresh();
     return box;
   }
 
   /* ---------- affichage ---------- */
   function render() {
-    renderGen++; loadQ.length = 0;
+    renderGen++; loadQ.length = 0; boards.clear();
     const box = $("catList"); box.replaceChildren();
     const missAll = missingThumbs(allProjects(work));
     if (missAll.length) box.appendChild(h("div", { class: "gen" }, [
