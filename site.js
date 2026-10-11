@@ -65,17 +65,36 @@
   }
   function setHeroImage(src) {   // l'image n'a pas de src dans index.html : on la choisit ici
     const img = document.querySelector(".hero-image img");
-    if (img && !img.getAttribute("src")) img.src = src || img.dataset.default || "fondo.jpeg";
+    if (!img || img.getAttribute("src")) return img;
+    const missing = () => { img.parentNode.classList.add("missing"); img.remove(); };
+    if (!src) { missing(); return null; }
+    img.onerror = () => {
+      if (img.srcset) { img.removeAttribute("srcset"); img.removeAttribute("sizes"); img.src = src; }   // pas de version allégée : photo complète
+      else missing();
+    };
+    if (src.startsWith(HERO_DIR + "/")) {                // créée par l'admin : une version allégée existe pour le mobile
+      img.sizes = "100vw";
+      img.srcset = `${mediumOf(src)} ${HERO_MED_W}w, ${src} ${HERO_FULL_W}w`;
+    }
+    img.src = src;
     return img;
   }
 
   const path = (p, file) => `${p.folder}/${file}`;
   // Version allégée (créée par l'admin : dossier/medium/NOM.jpg). Si elle n'existe pas encore, on retombe sur la photo complète.
-  const mediumPath = (p, file) => `${p.folder}/medium/${file.replace(/\.[^.]+$/, "")}.jpg`;
-  const LIGHT = window.matchMedia("(max-width: 900px)").matches || !!(navigator.connection && navigator.connection.saveData);
+  const mediumOf = full => full.replace(/(^|\/)([^/]+?)\.[^./]+$/, "$1medium/$2.jpg");
+  const mediumPath = (p, file) => mediumOf(path(p, file));
+  const HERO_DIR = "head-photo", HERO_MED_W = 1280, HERO_FULL_W = 2560;   // mêmes valeurs que l'admin
+  const LIGHT = window.matchMedia("(max-width: 900px)").matches || !!(navigator.connection && navigator.connection.saveData);   // mobile : versions allégées partout
   const cover = p => p.cover || p.photos[0];
 
   /* ---------- ACCUEIL ---------- */
+  // Les couvertures ne sont demandées que lorsqu'elles approchent de l'écran (économise beaucoup de données sur mobile).
+  const lazy = "IntersectionObserver" in window
+    ? new IntersectionObserver((entries, obs) => entries.forEach(e => {
+        if (e.isIntersecting) { obs.unobserve(e.target); e.target._load(); }
+      }), { rootMargin: "900px 0px" })
+    : null;
   function renderHome(data) {
     const wrap = document.getElementById("categories");
     data.categories.forEach(cat => {
@@ -84,12 +103,14 @@
       const grid = el("div", { class: "project-grid" });
       list.forEach(p => {
         const box = el("div", { class: "project-image placeholder" }, [el("span", { text: p.title.toUpperCase() })]);
-        const img = new Image();
-        img.alt = p.title;
-        img.onload = () => { box.className = "project-image"; box.replaceChildren(withMark(img)); };
         if (cover(p)) {
+          const img = new Image();
+          img.alt = p.title;
+          img.decoding = "async";
+          img.onload = () => { box.className = "project-image"; box.replaceChildren(withMark(img)); };
           img.onerror = () => { if (!img.dataset.fb) { img.dataset.fb = "1"; img.src = path(p, cover(p)); } };   // pas de version allégée : photo complète
-          img.src = mediumPath(p, cover(p));
+          box._load = () => { img.src = mediumPath(p, cover(p)); };
+          if (lazy) lazy.observe(box); else box._load();
         }
         grid.appendChild(el("a", { class: "project", href: `project.html?p=${encodeURIComponent(p.slug)}` }, [
           box,
@@ -134,25 +155,36 @@
     const items = [];            // dans l'ordre des photos : { fig, img, ratio, state }
     const ordered = () => items.filter(it => it.state === "ok").map(it => it.img);
     const narrow = window.matchMedia("(max-width: 700px)");
-    let lastKey = "";
+    let lastKey = "", mode = 0, col1 = null;
     function layout() {
       let k = 0;
       while (k < items.length && items[k].state !== "wait") k++;        // photos prêtes, sans trou
       const done = k === items.length, n = narrow.matches ? 1 : 2;
-      const key = `${k}|${n}`;
-      if (key === lastKey) return;
-      lastKey = key;
       const ok = items.slice(0, k).filter(it => it.state === "ok");
       if (done && !ok.length) {
         gal.replaceChildren(el("p", { class: "empty", text: `No photos yet — add them to ${p.folder}/` }));
         gal.classList.remove("loading");
         return;
       }
+      if (n === 1) {
+        // mobile : une seule colonne, on ajoute les photos au fur et à mesure sans toucher à celles déjà affichées
+        if (mode !== 1) {
+          mode = 1; col1 = el("div", { class: "gcol" });
+          items.forEach(it => { it.placed = false; });
+          gal.replaceChildren(col1);
+        }
+        ok.forEach(it => { if (!it.placed) { it.placed = true; col1.appendChild(it.fig); } });
+        if (ok.length) gal.classList.remove("loading");
+        return;
+      }
+      const key = `${k}|${n}`;
+      if (key === lastKey) return;
+      lastKey = key; mode = 2;
       const cols = splitColumns(ok.map(it => it.ratio), n, done);
       gal.replaceChildren(...cols.map(c => el("div", { class: "gcol" }, c.map(i => ok[i].fig))));
       gal.classList.remove("loading");
     }
-    const onBreakpoint = () => { lastKey = ""; layout(); };
+    const onBreakpoint = () => { lastKey = ""; mode = 0; layout(); };
     if (narrow.addEventListener) narrow.addEventListener("change", onBreakpoint); else narrow.addListener(onBreakpoint);
 
     // Chargement progressif : les photos sont demandées dans l'ordre, 2 à la fois, et seulement
@@ -179,7 +211,7 @@
       img.alt = `${p.title} — photo ${i + 1}`;
       img.tabIndex = 0;
       img.decoding = "async";
-      img.dataset.full = it.full;                        // la visionneuse affiche la version complète
+      if (!LIGHT) img.dataset.full = it.full;            // la visionneuse passe à la version complète (sauf mobile / économie de données)
       if (i < 2) img.fetchPriority = "high";
       img.onload = () => { it.ratio = (img.naturalWidth / img.naturalHeight) || 1; it.state = "ok"; layout(); finish(); };
       img.onerror = () => {
@@ -294,7 +326,7 @@
     })
     .catch(err => {
       console.error("Impossible de charger site.json", err);
-      if (page === "home") setHeroImage();
+      if (page === "home") setHeroImage(null);
       const m = document.querySelector("main");
       if (m) m.appendChild(el("p", { class: "empty", text: "Unable to load the content." }));
     });

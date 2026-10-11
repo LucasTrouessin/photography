@@ -293,16 +293,17 @@
     const d = new Date(), z = n => pad(n);
     return `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}${z(d.getSeconds())}`;
   };
-  const HERO_SIDE = 2560;                  // la grande photo s'affiche sur toute la largeur de l'écran
+  const HERO_DIR = "head-photo";          // dossier de la grande photo d'accueil (+ head-photo/medium/ pour le mobile)
+  const HERO_SIDE = 2560, HERO_Q = 0.82;  // la grande photo s'affiche sur toute la largeur de l'écran
+  const HERO_MED_SIDE = 1280, HERO_MED_Q = 0.75;   // version mobile de la grande photo (le site la choisit tout seul via srcset)
+  const fmt = n => n >= 1048576 ? (n / 1048576).toFixed(1).replace(".", ",") + " Mo" : Math.max(1, Math.round(n / 1024)) + " Ko";
   const isDirty = () => !!(saved && work) && (serialize(work) !== serialize(saved.data) || pendingThumbs.size > 0);
-  const thumbOfPath = path => {            // dossier/NOM.jpg -> dossier/thumbs/NOM.jpg
+  const sibling = (path, dir) => {         // dossier/NOM.png -> dossier/<dir>/NOM.jpg (aussi pour un fichier sans dossier)
     const i = path.lastIndexOf("/");
-    return path.slice(0, i) + "/thumbs/" + path.slice(i + 1).replace(/\.[^.]+$/, "") + ".jpg";
+    return path.slice(0, i + 1) + dir + "/" + path.slice(i + 1).replace(/\.[^.]+$/, "") + ".jpg";
   };
-  const mediumOfPath = path => {           // dossier/NOM.jpg -> dossier/medium/NOM.jpg
-    const i = path.lastIndexOf("/");
-    return path.slice(0, i) + "/medium/" + path.slice(i + 1).replace(/\.[^.]+$/, "") + ".jpg";
-  };
+  const thumbOfPath = path => sibling(path, "thumbs");
+  const mediumOfPath = path => sibling(path, "medium");
   const derivs = path => [thumbOfPath(path), mediumOfPath(path)];
   const toggle = (set, k) => set.has(k) ? set.delete(k) : set.add(k);
   const plural = (n, w) => `${n} ${w}${n > 1 ? "s" : ""}`;
@@ -818,14 +819,20 @@
 
   /* ---------- page d'accueil : grande photo ---------- */
   const heroSrc = path => previews.get(path) || encodeURI(path);
+  const heroThumb = path => previews.get(path) || encodeURI(repoFiles.has(thumbOfPath(path)) ? thumbOfPath(path) : path);
   const heroHistory = () => (work.hero && Array.isArray(work.hero.history)) ? work.hero.history : [];
   function setHeroState(image, history) {
     work.hero = Object.assign({}, work.hero, { image: image || "", history });
     if (!history.length) delete work.hero.history;
   }
   function forgetLocal(path) {             // photo choisie puis abandonnée avant tout enregistrement
-    pending.delete(path);
+    pending.delete(path); derivs(path).forEach(d => pendingThumbs.delete(d));
     if (previews.has(path)) { URL.revokeObjectURL(previews.get(path)); previews.delete(path); }
+  }
+  // La photo actuelle est « à optimiser » si elle n'est pas dans head-photo/ ou n'a pas encore sa version mobile.
+  function heroNeedsOptimizing(cur) {
+    if (!cur || pending.has(cur)) return false;
+    return !cur.startsWith(HERO_DIR + "/") || (treeKnown && !repoFiles.has(mediumOfPath(cur)));
   }
   function heroSection() {
     const cur = work.hero && work.hero.image, hist = heroHistory();
@@ -833,15 +840,23 @@
     input.addEventListener("change", () => { replaceHero(input.files[0]); input.value = ""; });
     const pic = cur ? h("img", { class: "hero-pv", alt: "Grande photo actuelle", src: heroSrc(cur) })
                     : h("div", { class: "hero-pv none" });
+    const pend = cur && pending.get(cur);
     const box = h("div", {}, [pic, input,
-      h("div", { class: "meta", text: cur ? `Fichier : ${cur}${pending.has(cur) ? " (nouvelle, pas encore enregistrée)" : ""}` : "Aucune photo" }),
-      h("div", { class: "btns", style: "margin-top:12px" }, [btn("Changer la photo", "Changer la grande photo de l'accueil", () => input.click())])
+      h("div", { class: "meta", text: cur ? `Fichier : ${cur}${pend ? ` · ${fmt(pend.blob.size)} (nouvelle, pas encore enregistrée)` : ""}` : "Aucune photo" }),
+      h("div", { class: "btns", style: "margin-top:12px" }, [btn("Changer la photo", "Changer la grande photo de l'accueil", () => input.click())]),
+      h("p", { class: "ph-note", text: `La photo est compressée (${HERO_SIDE} px max), une version mobile (${HERO_MED_SIDE} px) est créée automatiquement, et le tout est rangé dans le dossier ${HERO_DIR}/. Les métadonnées (dont le GPS) sont supprimées.` })
     ]);
+    if (heroNeedsOptimizing(cur)) box.appendChild(h("div", { class: "gen" }, [
+      h("span", { text: cur.startsWith(HERO_DIR + "/")
+        ? "Cette photo n'a pas de version mobile : elle est téléchargée en grande taille sur téléphone. "
+        : `Cette photo n'est pas dans ${HERO_DIR}/ et n'est ni compressée ni adaptée au mobile. ` }),
+      btn("Optimiser la photo actuelle", "Compresser la photo actuelle et la ranger dans head-photo", optimizeHero)
+    ]));
     if (hist.length) {
       box.appendChild(h("label", { class: "f", style: "margin-top:26px", text: `Anciennes photos · ${hist.length}` }));
       box.appendChild(h("p", { class: "ph-note", style: "margin-top:0", text: "Elles restent dans le dépôt mais ne s'affichent pas sur le site. « Utiliser » remet une photo à l'accueil (la photo actuelle rejoint alors cette liste)." }));
       box.appendChild(h("div", { class: "grid hero-hist" }, hist.map(path => h("div", { class: "tile" }, [
-        h("div", { class: "im" }, [h("img", { alt: path, src: heroSrc(path), decoding: "async" })]),
+        h("div", { class: "im" }, [h("img", { alt: path, src: heroThumb(path), decoding: "async" })]),
         h("div", { class: "tb" }, [
           btn("Utiliser", "Remettre cette photo à l'accueil", () => useHero(path)),
           btn("✕", "Supprimer définitivement cette ancienne photo", () => dropHero(path), false, "danger")
@@ -861,24 +876,44 @@
     setHeroState(work.hero.image, heroHistory().filter(x => x !== path));
     forgetLocal(path); changed();
   }
-  async function replaceHero(file) {
+  // Compresse la photo (2560 px) + crée la version mobile (1280 px) + une miniature, dans head-photo/.
+  // opts.dropOld : l'ancienne photo est supprimée au lieu d'être gardée dans les anciennes (cas « optimiser »).
+  async function replaceHero(file, opts) {
+    opts = opts || {};
     if (!file || busy) return;
-    busy = true; updateSave(); say($("saveMsg"), "Préparation de la photo…");
+    busy = true; updateSave(); say($("saveMsg"), "Compression de la photo…");
+    let path = null;
     try {
-      const blob = await resizeImpl(file, HERO_SIDE, QUALITY);
+      const blob = await resizeImpl(file, HERO_SIDE, HERO_Q);
+      path = `${HERO_DIR}/${stamp()}-${Math.random().toString(36).slice(2, 5).padEnd(3, "0")}.jpg`;
+      pending.set(path, { blob });
+      let mb = null;
+      try { mb = await resizeImpl(blob, HERO_MED_SIDE, HERO_MED_Q); pendingThumbs.set(mediumOfPath(path), { blob: mb }); } catch (e) { /* sans version mobile : le site retombera sur la grande photo */ }
+      try { pendingThumbs.set(thumbOfPath(path), { blob: await resizeImpl(mb || blob, THUMB_SIDE, THUMB_Q) }); } catch (e) { /* sans miniature : on affichera la photo */ }
+      previews.set(path, URL.createObjectURL(blob));
       const old = work.hero && work.hero.image;
       const hist = heroHistory().slice();
       if (old && pending.has(old)) forgetLocal(old);    // jamais publiée : inutile de la garder
-      else if (old) hist.unshift(old);                  // déjà en ligne : on la garde dans les anciennes
-      const path = `hero/${stamp()}-${Math.random().toString(36).slice(2, 5).padEnd(3, "0")}.jpg`;
-      pending.set(path, { blob });
-      previews.set(path, URL.createObjectURL(blob));
+      else if (old && !opts.dropOld) hist.unshift(old); // déjà en ligne : on la garde dans les anciennes
       setHeroState(path, hist);
       busy = false; changed();
-      say($("saveMsg"), "Nouvelle photo prête. Clique sur « Enregistrer » pour la publier.", "ok");
+      say($("saveMsg"), `Photo compressée${file.size ? ` : ${fmt(file.size)} → ${fmt(blob.size)}` : ""}${mb ? ` (version mobile : ${fmt(mb.size)})` : ""}. Clique sur « Enregistrer » pour la publier.`, "ok");
     } catch (e) {
+      if (path) forgetLocal(path);
       busy = false; updateSave(); say($("saveMsg"), "Ce format d'image n'est pas pris en charge.", "err");
     }
+  }
+  async function optimizeHero() {
+    const cur = work.hero && work.hero.image;
+    if (!cur || busy) return;
+    say($("saveMsg"), "Téléchargement de la photo actuelle…");
+    let src;
+    try {
+      const r = await fetch(encodeURI(cur), { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status);
+      src = await r.blob();
+    } catch (e) { say($("saveMsg"), "Impossible de relire la photo actuelle. Vérifie ta connexion et réessaie.", "err"); return; }
+    await replaceHero(src, { dropOld: true });
   }
 
   /* ---------- aperçu de la page d'un projet (même calcul que site.js) ---------- */
@@ -1035,7 +1070,7 @@
 
   if (window.__ADMIN_TEST__) window.__ADMIN_TEST__ = {
     connect, save, addCategory, addProject, deleteProject, deleteCategory, moveProject,
-    addPhotos, removePhoto, setCover, allProjects, slugify, sortableSource, sortableTarget,
+    addPhotos, removePhoto, setCover, replaceHero, optimizeHero, heroNeedsOptimizing, mediumOfPath, allProjects, slugify, sortableSource, sortableTarget,
     setResize: f => { resizeImpl = f; }, generateThumbs, missingThumbs, thumbOfPath, getRepoFiles: () => repoFiles, getThumbs: () => pendingThumbs,
     getWork: () => work, getSaved: () => saved, getPending: () => pending, isDirty, setDrag: d => { drag = d; }, getDrag: () => drag
   };
