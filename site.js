@@ -153,7 +153,9 @@
     const list = p.photos;
     if (!list.length) gal.appendChild(el("p", { class: "empty", text: "No photos yet." }));
     const items = [];            // dans l'ordre des photos : { fig, img, ratio, state }
-    const ordered = () => items.filter(it => it.state === "ok").map(it => it.img);
+    // photos affichées dans la galerie (dans l'ordre, sans trou) ; la visionneuse relit cette liste en direct
+    const shown = () => { const out = []; for (const x of items) { if (x.state === "wait") break; if (x.state === "ok") out.push(x.img); } return out; };
+    const lbSource = { nodes: shown, total: () => items.filter(x => x.state !== "bad").length };
     const narrow = window.matchMedia("(max-width: 700px)");
     let lastKey = "", mode = 0, col1 = null;
     function layout() {
@@ -222,6 +224,7 @@
       updateStatus(); pump();
     }
     function updateStatus() {
+      refreshLightbox();                                 // si la visionneuse est ouverte : compteur et flèches à jour
       const total = items.length;
       const ok = items.filter(x => x.state === "ok").length, bad = items.filter(x => x.state === "bad").length;
       status.replaceChildren();
@@ -254,7 +257,7 @@
         clearTimeout(it.timer);
         it.state = "bad"; layout(); finish();
       };
-      const open = () => openLightbox(ordered(), img);
+      const open = () => openLightbox(lbSource, img);
       img.addEventListener("click", open);
       img.addEventListener("keydown", e => { if (e.key === "Enter") open(); });
       it.fig.appendChild(withMark(img));
@@ -273,7 +276,7 @@
   }
 
   /* ---------- LIGHTBOX ---------- */
-  let lb, lbImg, lbCount, imgs = [], cur = 0, touchX = null;
+  let lb, lbImg, lbCount, imgs = [], cur = 0, touchX = null, lbSrc = null;
   function buildLightbox() {
     lbImg = el("img", { alt: "" });
     lbCount = el("span", { class: "count" });
@@ -308,19 +311,39 @@
       pre.src = full;
     }
     lbImg.alt = imgs[cur].alt;
-    lbCount.textContent = `${pad(cur + 1)} / ${pad(imgs.length)}`;
-    lbImg.style.cursor = cur === imgs.length - 1 ? "default" : "pointer";
+    syncUi();
+  }
+  // Compteur / flèches. Le total est le nombre final de photos, pas seulement celles déjà chargées :
+  // il ne bouge plus, et la flèche « suivant » reste (atténuée) tant que d'autres photos arrivent.
+  function syncUi() {
+    const total = Math.max(lbSrc ? lbSrc.total() : imgs.length, imgs.length);
+    const atEnd = cur === imgs.length - 1, more = imgs.length < total;
+    lbCount.textContent = `${pad(cur + 1)} / ${pad(total)}`;
+    lbImg.style.cursor = atEnd ? "default" : "pointer";
     lb.querySelector(".prev").style.visibility = cur === 0 ? "hidden" : "visible";
-    lb.querySelector(".next").style.visibility = cur === imgs.length - 1 ? "hidden" : "visible";
+    const nx = lb.querySelector(".next");
+    nx.style.visibility = atEnd && !more ? "hidden" : "visible";
+    nx.style.opacity = atEnd && more ? ".35" : "";
+  }
+  function syncList() {                                  // relit la liste en direct sans perdre la photo affichée
+    if (!lbSrc) return;
+    const here = imgs[cur];
+    imgs = lbSrc.nodes();
+    cur = Math.max(0, imgs.indexOf(here));
+  }
+  function refreshLightbox() {
+    if (!lb || !lb.classList.contains("open")) return;
+    syncList(); syncUi();
   }
   function go(d) {
+    syncList();
     const n = cur + d;
     if (n < 0 || n >= imgs.length) return;   // pas de boucle : on s'arrête aux extrémités
     cur = n; show();
   }
-  function openLightbox(nodes, img) {
+  function openLightbox(src, img) {
     if (!lb) buildLightbox();
-    imgs = Array.from(nodes); cur = imgs.indexOf(img);
+    lbSrc = src; imgs = Array.from(src.nodes()); cur = Math.max(0, imgs.indexOf(img));
     show(); lb.classList.add("open"); document.body.style.overflow = "hidden";
     lb.querySelector(".x").focus();
   }
