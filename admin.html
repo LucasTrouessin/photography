@@ -73,23 +73,15 @@
   .ph-bar .lbl{font:11px "DM Mono",monospace;text-transform:uppercase;color:var(--muted)}
   .ph-note{font-size:12px;color:var(--muted);line-height:1.5;margin:6px 0 10px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px}
-  .grid.drop{outline:2px dashed var(--fg);outline-offset:4px}
   .tile{border:1px solid var(--line);background:#fff;padding:4px}
   .tile .im{position:relative;aspect-ratio:1;background:#e4e1da;overflow:hidden}
   .tile img{width:100%;height:100%;object-fit:cover;display:block}
-  .tile .no{position:absolute;left:4px;top:4px;background:rgba(21,21,21,.85);color:#fff;font:9px "DM Mono",monospace;padding:2px 5px}
-  .tile .bd{position:absolute;left:4px;bottom:4px;background:var(--bg);font:9px "DM Mono",monospace;padding:2px 5px;text-transform:uppercase}
-  .tile .bd.new{background:#2c6b3a;color:#fff}
   .tile .tb{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-top:4px}
   .adm .tile .tb button{padding:7px 0;font-size:12px;letter-spacing:0;text-transform:none;border-color:var(--line);background:none;color:var(--fg)}
   .adm .tile .tb button.on{background:var(--fg);color:var(--bg)}
   .adm .tile .tb button:disabled{opacity:.25}
-  .tile .im.bad{cursor:pointer}
-  .tile .im.bad::after{content:"↻ Réessayer";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:10px "DM Mono",monospace;color:var(--muted);text-transform:uppercase;text-align:center}
-  .tile .im.bad img{visibility:hidden}
   .gen{margin:0 0 18px;padding:12px 14px;border:1px dashed var(--line);font-size:13px;color:var(--muted);line-height:1.5}
   .gen button{margin-top:10px}
-  .empty-ph{color:var(--muted);font-size:13px;padding:14px 0}
 
   /* filigrane */
   .wm-set{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:6px}
@@ -118,15 +110,41 @@
   .adm .hero-hist .tile .tb{grid-template-columns:1fr auto}
   .adm .hero-hist .tile .tb button{padding:7px 10px;font-size:11px}
 
-  /* aperçu de la page d'un projet */
-  .adm button.pv-tgl{margin-top:18px;background:none;color:var(--fg);border-color:var(--line)}
+  /* couverture du projet (en haut du projet déplié) */
+  .cover-box{margin:0 0 8px}
+  .cover-row{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap}
+  .cover-img{display:block;width:auto;height:auto;max-width:min(100%,260px);max-height:150px;background:#e4e1da;border:1px solid var(--line)}
+  .cover-row .meta{margin:0;max-width:260px;line-height:1.5}
+
+  /* aperçu de la page d'un projet = éditeur des photos */
   .pv{margin-top:12px;padding:14px;border:1px solid var(--line);background:var(--bg)}
-  .pv-cols{display:flex;gap:6px;align-items:flex-start;max-width:420px;margin:0 auto}
+  .pv.drop{outline:2px dashed var(--fg);outline-offset:-2px}
+  .pv-cols{display:flex;gap:3%;align-items:flex-start;max-width:520px;margin:0 auto}
   .pv-col{flex:1;min-width:0}
-  .pv-it{position:relative;margin:0 0 6px;background:#e4e1da}
-  .pv-it img{display:block;width:100%;height:auto}
-  .pv-it span{position:absolute;left:4px;top:4px;background:rgba(21,21,21,.85);color:#fff;font:9px "DM Mono",monospace;padding:2px 5px}
-  .pv-it.bad{aspect-ratio:3/2}
+  .pv-it{position:relative;margin:0 0 5%;background:#e4e1da;user-select:none;-webkit-user-select:none}   /* 5 % = même espace que GAP dans splitColumns */
+  .pv.fine .pv-it{cursor:grab}
+  .pv-it img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
+  .pv-it.dragging{opacity:.35}
+  .pv-it.mk-before{box-shadow:0 -4px 0 var(--fg)}     /* trait noir : la photo glissée ira ici */
+  .pv-it.mk-after{box-shadow:0 4px 0 var(--fg)}
+  .pv-it.sel{outline:2px solid var(--fg);outline-offset:-2px}
+  .pv-no{position:absolute;left:4px;top:4px;background:rgba(21,21,21,.85);color:#fff;font:9px "DM Mono",monospace;padding:2px 5px;pointer-events:none}
+  .pv-bd{position:absolute;right:4px;top:4px;display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none}
+  .pv-bd span{background:var(--bg);font:9px "DM Mono",monospace;padding:2px 5px;text-transform:uppercase}
+  .pv-bd span.new{background:#2c6b3a;color:#fff}
+  .pv-bar{position:absolute;left:5px;right:5px;bottom:5px;display:none;grid-template-columns:repeat(4,1fr);gap:3px}
+  .pv-it:focus-within .pv-bar,.pv-it.sel .pv-bar{display:grid}
+  @media (hover:hover){.pv-it:hover .pv-bar{display:grid}}
+  .adm .pv-bar button{margin:0;padding:7px 0;font-size:13px;letter-spacing:0;text-transform:none;background:rgba(245,244,240,.95);color:var(--fg);border:1px solid var(--line)}
+  .adm .pv-bar button.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+  .adm .pv-bar button.danger{color:#a3261c}
+  .adm .pv-bar button:disabled{opacity:.3}
+  @media (pointer:coarse){.adm .pv-bar button{padding:11px 0;font-size:15px}}
+  .pv-it.bad{cursor:pointer}
+  .pv-it.bad::after{content:"↻ Réessayer";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:10px "DM Mono",monospace;color:var(--muted);text-transform:uppercase;text-align:center}
+  .pv-it.bad img{visibility:hidden}
+  .pv-empty{color:var(--muted);font-size:13px;line-height:1.5;padding:26px 10px;text-align:center}
+  @media (max-width:700px){.pv{padding:8px}.pv-cols{max-width:none}}
 
   .savebar{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);padding:6px 20px 14px;margin:24px -20px 0;z-index:3}
   .savebar .msg{margin-top:10px}
@@ -225,10 +243,11 @@
   const pending = new Map();               // chemin -> { blob } : photos à envoyer au prochain enregistrement
   const pendingThumbs = new Map();         // chemin miniature -> { blob } : miniatures à envoyer
   const previews = new Map();              // chemin photo -> url locale de la miniature (aperçu immédiat)
+  const ratios = new Map();                // chemin photo -> largeur/hauteur déjà connue (mise en page instantanée à chaque réaffichage)
   let repoFiles = new Set();               // fichiers déjà présents dans le dépôt
   let treeKnown = false;                   // true si la liste des fichiers du dépôt a pu être lue
   let renderGen = 0;                       // sert à abandonner les chargements d'une ancienne vue
-  const ui = { cats: new Set(), projs: new Set(), pv: new Set() };   // éléments dépliés / aperçus ouverts
+  const ui = { cats: new Set(), projs: new Set(), sel: null };       // éléments dépliés ; sel = photo sélectionnée (chemin), pour les flèches au toucher
   let resizeImpl = resize;
   let busy = false;
 
@@ -545,18 +564,18 @@
   }
   function attempt(job) {
     const done = () => { loading--; pump(); };
-    job.img.onload = () => { job.box.classList.remove("bad"); done(); };
+    job.img.onload = () => { job.box.classList.remove("bad"); done(); if (job.cb && job.cb.ok) job.cb.ok(); };
     job.img.onerror = () => {
       done();
       job.tries++;
       if (job.tries < 3) { setTimeout(() => { loadQ.push(job); pump(); }, 700 * job.tries); }
       else if (job.k < job.urls.length - 1) { job.k++; job.tries = 0; loadQ.push(job); pump(); }
-      else job.box.classList.add("bad");                 // abandon : clic = réessayer
+      else { job.box.classList.add("bad"); if (job.cb && job.cb.bad) job.cb.bad(); }   // abandon : clic = réessayer
     };
     job.img.src = job.urls[job.k];
   }
-  function loadImage(img, box, urls) {
-    const job = { img, box, urls, k: 0, tries: 0, gen: renderGen };
+  function loadImage(img, box, urls, cb) {            // cb : { ok, bad } rappelés quand la photo est chargée / abandonnée
+    const job = { img, box, urls, k: 0, tries: 0, gen: renderGen, cb };
     box.addEventListener("click", () => {
       if (!box.classList.contains("bad")) return;
       job.k = 0; job.tries = 0; job.gen = renderGen; box.classList.remove("bad"); loadQ.push(job); pump();
@@ -622,6 +641,7 @@
     if (!confirm(`Retirer cette photo (${name}) ?`)) return;
     p.photos.splice(i, 1);
     if (p.cover === name) p.cover = "";
+    if (ui.sel === path) ui.sel = null;
     pending.delete(path); derivs(path).forEach(d => pendingThumbs.delete(d));
     if (previews.has(path)) { URL.revokeObjectURL(previews.get(path)); previews.delete(path); }
     changed();
@@ -670,6 +690,25 @@
   }
   function setCover(p, i) { p.cover = p.photos[i]; changed(); }
 
+  /* ---------- couverture : miniature en haut du projet déplié ---------- */
+  function coverBlock(p) {
+    const name = p.cover || p.photos[0];
+    if (!name) return null;
+    const path = `${p.folder}/${name}`, tp = thumbOfPath(path);
+    const src = previews.get(path) || encodeURI(repoFiles.has(tp) ? tp : path);
+    const where = p.cover ? `Photo ${pad(p.photos.indexOf(name) + 1)}` : "Par défaut : la 1re photo";
+    const how = FINE ? "Pour la changer, survole une photo de l'aperçu ci-dessous et clique sur ★."
+                     : "Pour la changer, touche une photo de l'aperçu ci-dessous, puis ★.";
+    return h("div", { class: "cover-box" }, [
+      h("label", { class: "f", text: "Couverture" }),
+      h("div", { class: "cover-row" }, [
+        h("img", { class: "cover-img", alt: `Couverture du projet (${name})`, src, decoding: "async" }),
+        h("p", { class: "meta", text: `${where}. ${how}` })
+      ])
+    ]);
+  }
+
+  /* ---------- photos d'un projet : l'aperçu de la page sert d'éditeur ---------- */
   function photoSection(p) {
     const wrap = h("div", {});
     const input = h("input", { type: "file", accept: "image/*", multiple: true, class: "hidden", "aria-label": "Choisir des photos" });
@@ -679,46 +718,146 @@
       btn("+ Ajouter des photos", "Ajouter des photos", () => input.click())
     ]));
     wrap.appendChild(input);
-    wrap.appendChild(h("p", { class: "ph-note", text: "Les photos sont réduites à 2000 px et leurs métadonnées (dont le GPS) sont supprimées avant l'envoi. Sur ordinateur, tu peux aussi les glisser ici." }));
+    const how = FINE
+      ? "Glisse une photo vers l'endroit où tu veux la placer (le trait noir montre où elle ira) : même mise en page que sur le site, 1 à gauche, 2 à droite, etc. Dépose des photos depuis ton ordinateur pour en ajouter. Survole une photo pour la mettre en couverture (★) ou la retirer (✕). "
+      : "Touche une photo pour la sélectionner, puis utilise ← → pour la reculer ou l'avancer, ★ pour la mettre en couverture, ✕ pour la retirer. Sur le site mobile, les photos s'affichent l'une sous l'autre, dans cet ordre. ";
+    wrap.appendChild(h("p", { class: "ph-note", text: how + "Les photos sont réduites à 2000 px et leurs métadonnées (dont le GPS) sont supprimées avant l'envoi." }));
     const miss = missingThumbs([p]);
     if (miss.length) wrap.appendChild(h("div", { class: "gen" }, [
       h("span", { text: `${plural(miss.length, "photo")} sans version allégée (miniature admin + version mobile du site). ` }),
       btn("Créer les versions allégées", "Créer les versions allégées de ce projet", () => generateThumbs([p]))
     ]));
-    const grid = h("div", { class: "grid" });
-    if (!p.photos.length) grid.appendChild(h("div", { class: "empty-ph", text: "Aucune photo pour l'instant." }));
-    const eff = p.cover || p.photos[0];
-    p.photos.forEach((name, i) => {
-      const path = `${p.folder}/${name}`, isNew = pending.has(path);
-      const img = h("img", { alt: name, decoding: "async" });
-      const im = h("div", { class: "im" }, [img, h("span", { class: "no", text: pad(i + 1) })]);
-      if (previews.has(path)) img.setAttribute("src", previews.get(path));
+    wrap.appendChild(photoBoard(p));
+    return wrap;
+  }
+
+  // L'aperçu (2 colonnes, mêmes proportions que le site) : on y glisse les photos pour les ranger.
+  // Un déplacement ne redessine que l'aperçu (les images ne sont pas rechargées).
+  function photoBoard(p) {
+    const box = h("div", { class: "pv" + (FINE ? " fine" : "") });
+    const note = h("p", { class: "ph-note", style: "margin:0 0 10px" });
+    const area = h("div", { class: "pv-cols" });
+    box.appendChild(note); box.appendChild(area);
+    const pathOf = n => `${p.folder}/${n}`;
+    const items = new Map();                                   // nom de photo -> { fig, img, ratio, state, … }
+    const clearMarks = () => items.forEach(it => it.fig.classList.remove("mk-before", "mk-after", "dragging"));
+
+    function select(name) {                                    // toucher : sélectionne / désélectionne
+      ui.sel = ui.sel === pathOf(name) ? null : pathOf(name);
+      items.forEach(it => it.fig.classList.toggle("sel", it.path === ui.sel));
+    }
+    function reordered() { draw(); updateSave(); say($("saveMsg"), ""); }
+    function move(name, d) {                                   // flèches : une place plus tôt / plus tard
+      const i = p.photos.indexOf(name);
+      if (i < 0 || i + d < 0 || i + d >= p.photos.length) return;
+      swap(p.photos, i, d);
+      reordered();
+      items.get(name).fig.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+
+    function makeItem(name) {
+      const path = pathOf(name), known = ratios.get(path);
+      const img = h("img", { alt: name, decoding: "async", draggable: "false" });
+      const no = h("span", { class: "pv-no" });
+      const bd = h("span", { class: "pv-bd" });
+      const bPrev = btn("←", "Reculer d'une place", () => move(name, -1));
+      const bNext = btn("→", "Avancer d'une place", () => move(name, 1));
+      const bCover = btn("★", "Définir comme couverture", () => setCover(p, p.photos.indexOf(name)));
+      const bDel = btn("✕", "Retirer la photo", () => removePhoto(p, p.photos.indexOf(name)), false, "danger");
+      [[bPrev, "Reculer d'une place"], [bNext, "Avancer d'une place"], [bCover, "Couverture"], [bDel, "Retirer la photo"]].forEach(([b, t]) => b.title = t);
+      const fig = h("figure", { class: "pv-it", tabindex: "0" }, [img, no, bd, h("div", { class: "pv-bar" }, [bPrev, bNext, bCover, bDel])]);
+      const it = { name, path, fig, img, no, bd, bPrev, bNext, bCover, ratio: known || 1.5, state: known ? "ok" : "wait" };
+      fig.style.aspectRatio = String(it.ratio);
+
+      const ok = () => {
+        it.ratio = (img.naturalWidth / img.naturalHeight) || 1.5; ratios.set(path, it.ratio);
+        fig.style.aspectRatio = String(it.ratio);
+        const was = it.state; it.state = "ok";
+        if (was !== "ok") draw();                              // ratio nouveau : on (re)calcule les colonnes
+      };
+      const bad = () => { if (it.state === "wait") { it.state = "bad"; draw(); } };
+      if (previews.has(path)) { img.onload = ok; img.onerror = bad; img.src = previews.get(path); }
       else {
         const tp = thumbOfPath(path), full = encodeURI(path);
-        loadImage(img, im, repoFiles.has(tp) ? [encodeURI(tp), full] : [full]);
+        loadImage(img, fig, repoFiles.has(tp) ? [encodeURI(tp), full] : [full], { ok, bad });
       }
-      if (isNew) im.appendChild(h("span", { class: "bd new", text: "Nouveau" }));
-      else if (name === eff) im.appendChild(h("span", { class: "bd", text: "Couverture" }));
-      const tile = h("div", { class: "tile" }, [im, h("div", { class: "tb" }, [
-        btn("←", "Photo précédente", () => { swap(p.photos, i, -1); changed(); }, i === 0),
-        btn("→", "Photo suivante", () => { swap(p.photos, i, 1); changed(); }, i === p.photos.length - 1),
-        h("button", { type: "button", class: "sm" + (name === eff ? " on" : ""), "aria-label": "Définir comme couverture", title: "Couverture", text: "★", onclick: () => setCover(p, i), disabled: name === eff }),
-        btn("✕", "Retirer la photo", () => removePhoto(p, i), false, "danger")
-      ])]);
-      sortableSource(tile, p.photos, i, im); sortableTarget(tile, p.photos, i);
-      grid.appendChild(tile);
-    });
-    // dépôt de fichiers depuis l'ordinateur
-    grid.addEventListener("dragover", e => {
-      if (!drag && e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files")) { e.preventDefault(); grid.classList.add("drop"); }
-    });
-    grid.addEventListener("dragleave", () => grid.classList.remove("drop"));
-    grid.addEventListener("drop", e => {
-      grid.classList.remove("drop");
+
+      if (!FINE) fig.addEventListener("click", e => {          // toucher : afficher les boutons de cette photo
+        if (e.target.closest("button") || fig.classList.contains("bad")) return;
+        select(name);
+      });
+      if (FINE) {                                              // ordinateur : glisser-déposer sur l'aperçu
+        fig.setAttribute("draggable", "true");
+        fig.addEventListener("dragstart", e => {
+          drag = { arr: p.photos, from: p.photos.indexOf(name) };
+          if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = "move";
+            try { e.dataTransfer.setData("text/plain", "x"); } catch (_) {}
+            if (e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(img, 16, 16);
+          }
+          setTimeout(() => fig.classList.add("dragging"), 0);
+        });
+        fig.addEventListener("dragend", () => { drag = null; clearMarks(); });
+        fig.addEventListener("dragover", e => {
+          if (!drag || drag.arr !== p.photos) return;
+          e.preventDefault();
+          const to = p.photos.indexOf(name);
+          items.forEach(x => x.fig.classList.remove("mk-before", "mk-after"));
+          if (to !== drag.from) fig.classList.add(to > drag.from ? "mk-after" : "mk-before");
+        });
+        fig.addEventListener("dragleave", e => { if (!fig.contains(e.relatedTarget)) fig.classList.remove("mk-before", "mk-after"); });
+        fig.addEventListener("drop", e => {
+          if (!drag || drag.arr !== p.photos) return;          // fichier venant de l'ordinateur : géré plus bas
+          e.preventDefault(); e.stopPropagation();
+          const from = drag.from, to = p.photos.indexOf(name);
+          drag = null; clearMarks();
+          if (from !== to) { const [n] = p.photos.splice(from, 1); p.photos.splice(to, 0, n); reordered(); }
+        });
+      }
+      return it;
+    }
+
+    function draw() {
+      const order = p.photos.map(n => items.get(n));
+      const eff = p.cover || p.photos[0];
+      order.forEach((it, i) => {
+        it.no.textContent = pad(i + 1);
+        const isNew = pending.has(it.path), isCover = it.name === eff;
+        it.bd.replaceChildren(...[isNew && h("span", { class: "new", text: "Nouveau" }), isCover && h("span", { text: "Couverture" })].filter(Boolean));
+        it.bPrev.disabled = i === 0; it.bNext.disabled = i === order.length - 1;
+        it.bCover.disabled = isCover; it.bCover.classList.toggle("on", isCover);
+        it.fig.classList.toggle("sel", it.path === ui.sel);
+      });
+      // comme site.js : on place les photos prêtes, dans l'ordre et sans trou ; les autres arrivent au fil du chargement
+      let k = 0;
+      while (k < order.length && order[k].state !== "wait") k++;
+      const done = k === order.length;
+      note.hidden = done;
+      if (!done) note.textContent = `Chargement de l'aperçu… ${k}/${order.length}`;
+      const shown = order.slice(0, k);
+      const cols = splitColumns(shown.map(it => it.ratio), 2, done);
+      area.replaceChildren(...cols.map(c => h("div", { class: "pv-col" }, c.map(i => shown[i].fig))));
+    }
+
+    // dépôt de fichiers depuis l'ordinateur, n'importe où sur l'aperçu
+    const hasFiles = e => !drag && e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files");
+    box.addEventListener("dragover", e => { if (hasFiles(e)) { e.preventDefault(); box.classList.add("drop"); } });
+    box.addEventListener("dragleave", e => { if (!box.contains(e.relatedTarget)) box.classList.remove("drop"); });
+    box.addEventListener("drop", e => {
+      box.classList.remove("drop");
       if (!drag && e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) { e.preventDefault(); addPhotos(p, e.dataTransfer.files); }
     });
-    wrap.appendChild(grid);
-    return wrap;
+
+    if (!p.photos.length) {
+      note.hidden = true;
+      area.appendChild(h("div", { class: "pv-empty", text: FINE
+        ? "Aucune photo pour l'instant. Dépose des photos ici ou utilise « + Ajouter des photos »."
+        : "Aucune photo pour l'instant. Utilise « + Ajouter des photos »." }));
+      return box;
+    }
+    p.photos.forEach(name => items.set(name, makeItem(name)));
+    draw();
+    return box;
   }
 
   /* ---------- affichage ---------- */
@@ -774,18 +913,14 @@
 
           if (pOpen) {
             const pb = h("div", { class: "body" });
+            const cv = coverBlock(p);
+            if (cv) pb.appendChild(cv);
             pb.appendChild(h("label", { class: "f", text: "Titre" }));
             pb.appendChild(editable({ label: "titre du projet", cls: "big", get: () => p.title, set: v => { p.title = v; }, onChange: changed, placeholder: "Titre du projet" }));
             pb.appendChild(h("label", { class: "f", text: "Description (facultatif)" }));
             pb.appendChild(editable({ label: "description du projet", multiline: true, get: () => p.description || "", set: v => { p.description = v; }, onChange: updateSave, placeholder: "Ajouter une description…" }));
             pb.appendChild(h("div", { class: "meta", text: `Dossier : ${p.folder}` }));
             pb.appendChild(photoSection(p));
-            if (p.photos.length) {
-              const pvOpen = ui.pv.has(p.slug);
-              pb.appendChild(btn(pvOpen ? "Masquer l'aperçu de la page" : "Voir l'aperçu de la page", "Aperçu de la mise en page du projet",
-                () => { toggle(ui.pv, p.slug); render(); }, false, "pv-tgl"));
-              if (pvOpen) pb.appendChild(pagePreview(p));
-            }
             const row = h("div", { class: "btns" });
             const others = cats.map((c, i) => ({ c, i })).filter(x => x.i !== ci);
             if (others.length) {
@@ -927,30 +1062,6 @@
     });
     if (final && n === 2 && hts[1] > hts[0] + 1e-6 && cols[1].length > 1) cols[0].push(cols[1].pop());
     return cols;
-  }
-  function pagePreview(p) {
-    const note = h("p", { class: "ph-note", style: "margin-top:0", text: "Chargement de l'aperçu…" });
-    const area = h("div", { class: "pv-cols" });
-    const items = p.photos.map((name, i) => {
-      const path = `${p.folder}/${name}`, tp = thumbOfPath(path);
-      const img = h("img", { alt: name, decoding: "async" });
-      const it = { i, img, ratio: 1.5, state: "wait" };
-      img.onload = () => { it.ratio = (img.naturalWidth / img.naturalHeight) || 1.5; it.state = "ok"; draw(); };
-      img.onerror = () => { it.state = "bad"; draw(); };
-      img.src = previews.get(path) || encodeURI(repoFiles.has(tp) ? tp : path);
-      return it;
-    });
-    function draw() {
-      const left = items.filter(it => it.state === "wait").length;
-      if (left) { note.textContent = `Chargement de l'aperçu… ${items.length - left}/${items.length}`; return; }
-      note.textContent = "Sur ordinateur, comme sur le site. Sur téléphone, les photos s'affichent l'une sous l'autre, dans l'ordre.";
-      const cols = splitColumns(items.map(it => it.ratio), 2, true);
-      area.replaceChildren(...cols.map(c => h("div", { class: "pv-col" }, c.map(k => {
-        const it = items[k];
-        return h("div", { class: "pv-it" + (it.state === "bad" ? " bad" : "") }, [it.img, h("span", { text: pad(it.i + 1) })]);
-      }))));
-    }
-    return h("div", { class: "pv" }, [note, area]);
   }
 
   /* ---------- filigrane ---------- */
